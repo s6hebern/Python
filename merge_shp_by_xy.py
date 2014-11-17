@@ -137,7 +137,7 @@ for i in range(len(points_2006)):
             
         counter += 1
             
-    ### create 'progress bar' ###
+    ### create progress bar ###
     if i == round(len(points_2006) * 10 / 100):
         print "... 10 % ..." ,
     if i == round(len(points_2006) * 20 / 100):
