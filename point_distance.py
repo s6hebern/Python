@@ -68,7 +68,7 @@ for i in range(len(source_coords)):
     
     out_list.append([id1, min_id, min_dist])
     
-    ### create 'progress bar' ###
+    ### create progress bar ###
     if i == round(len(source_coords) * 10 / 100):
         print "... 10 % ..." ,
     if i == round(len(source_coords) * 20 / 100):
