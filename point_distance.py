@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""
+'''
 Created on Mon Nov 17 11:21:48 2014
 
 @author: Hendrik
-"""
+'''
 
 ### get distance between source point shapefile and closest point in target shapefile ###
 
@@ -12,12 +12,12 @@ import os
 import csv
 
 ### open shapefiles ###
-print "Reading data..."
+print 'Reading data...'
 
-source = r"D:\Uni\Masterarbeit\shapes\stations_germany_landuse.shp"
-target = r"D:\Uni\Masterarbeit\LUCAS\shapes\LUCAS_all_WGS84_lu.shp"
+source = 'D:/Uni/Masterarbeit/shapes/stations_germany_landuse.shp'
+target = 'D:/Uni/Masterarbeit/LUCAS/shapes/LUCAS_all_WGS84_lu.shp'
 
-driver = ogr.GetDriverByName("ESRI Shapefile")
+driver = ogr.GetDriverByName('ESRI Shapefile')
 
 source_shp = driver.Open(source, 0)
 source_lyr = source_shp.GetLayer()
@@ -29,19 +29,20 @@ target_lyr = target_shp.GetLayer()
 source_coords = []
 target_coords = []
 
-print "Getting coordinates..."
+print 'Getting coordinates...'
 
 for i in range(source_lyr.GetFeatureCount()):
     feat = source_lyr.GetFeature(i)
-    source_coords.append([feat.GetField("Stations_i"), feat.GetField("X"), feat.GetField("Y")])
+    source_coords.append([feat.GetField('Stations_i'), feat.GetField('X'), feat.GetField('Y')])
+    # feat.geometry().GetX() & feat.geometry().GetY() should do the same, but not for these files (don't know why)
     
 for i in range(target_lyr.GetFeatureCount()):
     feat = target_lyr.GetFeature(i)
-    target_coords.append([feat.GetField("ID"), feat.GetField("X"), feat.GetField("Y")])
+    target_coords.append([feat.GetField('ID'), feat.GetField('X'), feat.GetField('Y')])
     
 ### calculate distances and get minimum ###
 
-print "Calculating distances..."
+print 'Calculating distances...'
 
 out_list = []
 
@@ -68,41 +69,41 @@ for i in range(len(source_coords)):
     
     out_list.append([id1, min_id, min_dist])
     
-    ### create progress bar ###
+    ### create 'progress bar' ###
     if i == round(len(source_coords) * 10 / 100):
-        print "... 10 % ..." ,
+        print '... 10 % ...' ,
     if i == round(len(source_coords) * 20 / 100):
-        print "20 % ..." ,
+        print '20 % ...' ,
     if i == round(len(source_coords) * 30 / 100):
-        print "30 % ..." ,
+        print '30 % ...' ,
     if i == round(len(source_coords) * 40 / 100):
-        print "40 % ..."   ,      
+        print '40 % ...'   ,      
     if i == round(len(source_coords) * 50 / 100):
-        print "50 % ..."     ,    
+        print '50 % ...'     ,    
     if i == round(len(source_coords) * 60 / 100):
-        print "60 % ..."  ,
+        print '60 % ...'  ,
     if i == round(len(source_coords) * 70 / 100):
-        print "70 % ..." ,
+        print '70 % ...' ,
     if i == round(len(source_coords) * 80 / 100):
-        print "80 % ..." ,
+        print '80 % ...' ,
     if i == round(len(source_coords) * 90 / 100):
-        print "90 % ..." ,
+        print '90 % ...' ,
     if i == len(source_coords) - 1:
-        print "100 %"
+        print '100 %'
 
 source = None
 target = None
 
 ### create output file as csv ###
 
-print "Writing output..."
+print 'Writing output...'
 
-outfile = r"D:\Uni\Masterarbeit\min_dist_phen_LUCAS.csv"
+outfile = 'D:/Uni/Masterarbeit/min_dist_phen_LUCAS.csv'
 
 if os.path.exists(outfile):
     os.remove(outfile)
 
-header = ["STATION_ID", "LUCAS_ID", "DIST"]
+header = ['STATION_ID', 'LUCAS_ID', 'DIST']
 with open(outfile, 'wb') as csvfile:
     writer = csv.writer(csvfile, delimiter = ',')
     writer.writerow(header)
@@ -110,4 +111,4 @@ with open(outfile, 'wb') as csvfile:
     
 csvfile.close()
 
-print "Done!"
+print 'Done!'
