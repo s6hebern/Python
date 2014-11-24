@@ -26,3 +26,6 @@ axis(1, at=1:length(classes), labels=F)
 # add legend:
 legend(x=1, y=max(counts), legend=c("mean", "mean + 1/2 stdv.", "mean + 1 stdv."), lty=c(1, 3, 2), 
        col=c("red", "black", "black"), bty="n")
+       
+       
+       test
