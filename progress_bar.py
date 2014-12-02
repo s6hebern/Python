@@ -10,16 +10,20 @@ Created on Fri Nov 28 12:19:35 2014
 to function progress(): iterator, which is the iterator within a loop, and \
 iterable, which is the iterable object to which the loop is applied. """
 
-class prog_Bar():
-    def __init__(self, parent = None):
-        self.percent = range(5, 105, 5)
-        print 'Progress (%): ' ,
-        
-    def progress(self, iterator, iterable):
-        for i in self.percent:
-            if iterator == round((len(iterable) - 1) * i / 100):
-                if i % 10 == 5:
-                    print '.' ,
-                else:
-                    print i ,
-        print '\n'
+def progress(iterator, iterable):
+
+    percent = range(5, 105, 5)
+    if len(iterable) == 0:
+        print 'Iterable object has length 0!',
+    else:
+        if iterator == iterable[0]:
+            print 'Progress (%): ' ,
+        else:
+            for i in percent:
+                if iterator == round((len(iterable) - 1) * i / 100):
+                    if i % 10 == 5:
+                        print '.' ,
+                    else:
+                        print i ,
+            if iterator == iterable[-1]:
+                print '\n', 'Done!', '\n'
