@@ -5,4 +5,4 @@ Languages: R and Python
 More coming soon ;)
 
 Attention:
-Many scripts are "Dummy scripts", which means that they have to be adjusted, e.g. by using correct filenames!
+Many scripts are "Dummy scripts", which means that they have to be adjusted, e.g. by using correct filenames, output formats and so on!
