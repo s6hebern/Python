@@ -5,110 +5,106 @@ Created on Mon Nov 17 11:21:48 2014
 @author: Hendrik
 '''
 
-### get distance between source point shapefile and closest point in target shapefile ###
+''' Calculates the distance between the points in the source shapefile to the 
+    closest respective point in the target shapefile and writes the outcome into
+    a comma-separated csv file. '''
 
-from osgeo import ogr
-import os
-import csv
+def point_distance(source, target, source_id, target_id, csv):
 
-### open shapefiles ###
-print 'Reading data...'
-
-source = 'D:/Uni/Masterarbeit/shapes/stations_germany_landuse.shp'
-target = 'D:/Uni/Masterarbeit/LUCAS/shapes/LUCAS_all_WGS84_lu.shp'
-
-driver = ogr.GetDriverByName('ESRI Shapefile')
-
-source_shp = driver.Open(source, 0)
-source_lyr = source_shp.GetLayer()
-target_shp = driver.Open(target, 0)
-target_lyr = target_shp.GetLayer()
-
-### get feature coordinates ###
-
-source_coords = []
-target_coords = []
-
-print 'Getting coordinates...'
-
-for i in range(source_lyr.GetFeatureCount()):
-    feat = source_lyr.GetFeature(i)
-    source_coords.append([feat.GetField('Stations_i'), feat.GetField('X'), feat.GetField('Y')])
-    # feat.geometry().GetX() & feat.geometry().GetY() should do the same, but not for these files (don't know why)
+    from osgeo import ogr
+    import os
+    import math
+    import csv
     
-for i in range(target_lyr.GetFeatureCount()):
-    feat = target_lyr.GetFeature(i)
-    target_coords.append([feat.GetField('ID'), feat.GetField('X'), feat.GetField('Y')])
+    ### open shapefiles ###
+    print 'Reading data...'
     
-### calculate distances and get minimum ###
-
-print 'Calculating distances...'
-
-out_list = []
-
-for i in range(len(source_coords)):
-    id1 = source_coords[i][0]
-    x1 = source_coords[i][1]
-    y1 = source_coords[i][2]
+    source = source
+    target = target
     
-    dist = []
-    id2_list = []
+    driver = ogr.GetDriverByName('ESRI Shapefile')
     
-    for j in range(len(target_coords)):
-        id2 = target_coords[j][0]
-        x2 = target_coords[j][1]
-        y2 = target_coords[j][2]
-        id2_list.append(id2)
+    source_shp = driver.Open(source, 0)
+    source_lyr = source_shp.GetLayer()
+    target_shp = driver.Open(target, 0)
+    target_lyr = target_shp.GetLayer()
+    
+    ### get feature coordinates ###
+    
+    source_coords = []
+    src_coords_append = source_coords.append()
+    target_coords = []
+    tgt_coords_append = target_coords.append()
+    
+    print 'Getting coordinates...'
+    
+    for i in xrange(source_lyr.GetFeatureCount()):
+        feat = source_lyr.GetFeature(i)
+        src_coords_append([feat.GetField(source_id), feat.geometry().GetX(), feat.geometry().GetX()])
+        feat = None
         
-        ### calculation ###
-        dist.append(sqrt(((x1 - x2) **2) + ((y1 - y2) **2)))
+    for i in xrange(target_lyr.GetFeatureCount()):
+        feat = target_lyr.GetFeature(i)
+        tgt_coords_append([feat.GetField(target_id), feat.geometry().GetX(), feat.geometry().GetX()])
+        feat = None
+        
+    ### calculate distances and get minimum ###
     
-    ### get minimum and coresponding indices ###
-    min_dist = min(dist)
-    min_id = id2_list[dist.index(min(dist))]
+    print 'Calculating distances...'
     
-    out_list.append([id1, min_id, min_dist])
+    out_list = []
+    out_list_append = out_list.append()
     
-    ### create 'progress bar' ###
-    if i == round(len(source_coords) * 10 / 100):
-        print '... 10 % ...' ,
-    if i == round(len(source_coords) * 20 / 100):
-        print '20 % ...' ,
-    if i == round(len(source_coords) * 30 / 100):
-        print '30 % ...' ,
-    if i == round(len(source_coords) * 40 / 100):
-        print '40 % ...'   ,      
-    if i == round(len(source_coords) * 50 / 100):
-        print '50 % ...'     ,    
-    if i == round(len(source_coords) * 60 / 100):
-        print '60 % ...'  ,
-    if i == round(len(source_coords) * 70 / 100):
-        print '70 % ...' ,
-    if i == round(len(source_coords) * 80 / 100):
-        print '80 % ...' ,
-    if i == round(len(source_coords) * 90 / 100):
-        print '90 % ...' ,
-    if i == len(source_coords) - 1:
-        print '100 %'
-
-source = None
-target = None
-
-### create output file as csv ###
-
-print 'Writing output...'
-
-outfile = 'D:/Uni/Masterarbeit/min_dist_phen_LUCAS.csv'
-
-if os.path.exists(outfile):
-    os.remove(outfile)
-
-header = ['STATION_ID', 'LUCAS_ID', 'DIST']
-with open(outfile, 'wb') as csvfile:
-    writer = csv.writer(csvfile, delimiter = ',')
-    writer.writerow(header)
-    writer.writerows(out_list)
+    for i in xrange(len(source_coords)):
+        id1 = source_coords[i][0]
+        x1 = source_coords[i][1]
+        y1 = source_coords[i][2]
+        
+        dist = []
+        dist_append = dist.append()
+        id2_list = []
+        id2_list_append = id2_list.append()
+        
+        for j in xrange(len(target_coords)):
+            id2 = target_coords[j][0]
+            x2 = target_coords[j][1]
+            y2 = target_coords[j][2]
+            id2_list_append(id2)
+            
+            ### calculation ###
+            dist_append(math.sqrt(((x1 - x2) **2) + ((y1 - y2) **2)))
+        
+        ### get minimum and coresponding indices ###
+        min_dist = min(dist)
+        min_id = id2_list[dist.index(min_dist)]
+        
+        out_list_append([id1, min_id, min_dist])
+        
+        ### create 'progress bar' ###
+        try:
+            import module_progress_bar as pr
+            pr.progress(i, xrange(len(source_coords)))
+        except:
+            pass
     
-csvfile.close()
-
-print 'Done!'
+    source = None
+    target = None
+    
+    ### create output file as csv ###
+    
+    print 'Writing output...'
+    
+    outfile = csv
+    
+    if os.path.exists(outfile):
+        os.remove(outfile)
+    
+    header = [source_id, target_id, 'DIST']
+    with open(outfile, 'wb') as csvfile:
+        writer = csv.writer(csvfile, delimiter = ',')
+        writer.writerow(header)
+        writer.writerows(out_list)
+        
+    csvfile.close()
+    
+    print 'Done!'
