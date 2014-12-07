@@ -26,4 +26,4 @@ def progress(iterator, iterable):
                     else:
                         print i ,
             if iterator == iterable[-1]:
-                print '\n'
+                print '\n',
