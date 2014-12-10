@@ -17,7 +17,7 @@ Created on Fri Dec 05 13:45:23 2014
     out_shape: the name of the output shapefile (full path and file extension).
     
     fields: a LIST of the desired attribute fields to keep, given as strings, in
-            the same order as the inout shapefiles. If more than one field shall
+            the same order as the input shapefiles. If more than one field shall
             be kept, use a TUPLE of strings for the respective shapefile. If not
             set, no attribute fields will be written except for an ID field.
             
