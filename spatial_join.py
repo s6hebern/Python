@@ -6,7 +6,7 @@ Created on Fri Dec 05 13:45:23 2014
 """
 
 """ 
-    Spatial join oftwo or more point shapefiles. Writes a new shapefile
+    Spatial join of two or more point shapefiles. Writes a new shapefile
     cotaining the common points and one attribute field from each shapefile. 
     
     Use:
