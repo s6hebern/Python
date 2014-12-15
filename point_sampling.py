@@ -69,14 +69,11 @@ def point_sampling(raster, shape, dataType, precision=None, names=None):
         fieldNames = names
     
     # loop through all bands, create fields and write values:
-    print lyr.GetFeature(0).keys()
-    print fieldNames
     for f in xrange(bands):
         # check if fields already exist:
         if fieldNames[f] in lyr.GetFeature(0).keys():
             pass
         else:
-            print 'Create fields'
             field = ogr.FieldDefn(fieldNames[f], dataType)
             if precision == None:
                 field.SetWidth(len(str(maxVal)))
