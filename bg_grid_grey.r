@@ -8,13 +8,13 @@ bg_grid_grey <- function() {
   # draw grid at major tickmarks
     grid(lty=1, col="white")
   # draw vertical lines at minor x-tickmarks:
-    for (v in seq(par("xaxp")[1], par("xaxp")[2] + par("xaxp")[2]/(par("xaxp")[3]*2), 
-                  par("xaxp")[2]/(par("xaxp")[3]*2))) {
+    for (v in seq(par("xaxp")[1], par("xaxp")[2] + par("xaxp")[2] / (par("xaxp")[3] * 2), 
+                  par("xaxp")[2] / (par("xaxp")[3] * 2))) {
       abline(v=v, col="grey90")
     }
   # draw horizontal lines at minor y-tickmarks:
-    for (h in seq(par("yaxp")[1], par("yaxp")[2] + par("yaxp")[2]/(par("yaxp")[3]*2), 
-                  par("yaxp")[2]/(par("yaxp")[3]*2))) {
+    for (h in seq(par("yaxp")[1], par("yaxp")[2] + par("yaxp")[2] / (par("yaxp")[3] * 2), 
+                  par("yaxp")[2] / (par("yaxp")[3] * 2))) {
       abline(h=h, col="grey90")
     }
 }
