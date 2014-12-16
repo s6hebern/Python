@@ -1,6 +1,7 @@
 # Function to calculate a grid which will be drawn at the major and minor tickmarks of a plot.
 # "Major" grid will be white, "minor" grid will be grey.
-# Also changes the background colour of the plot to lightgrey and draws grey axis.
+# Also changes the background colour of the plot to lightgrey.
+# Draws grey axis by default. If xy_lines ist set FALSE, axis will not be drawn.
 #
 # Hints when setting up initial plot:
 # - prevent any drawing of your data, do this after calling this function (e.g. with pch=NA)
