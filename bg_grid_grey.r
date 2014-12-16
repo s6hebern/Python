@@ -25,3 +25,9 @@ bg_grid_grey <- function() {
   axis(1, lwd=0, lwd.ticks=1, col="lightgrey")
   axis(2, lwd=0, lwd.ticks=1, col="lightgrey")
 }
+
+# Example:
+# data <- runif(100, 0, 100) # generate random numbers
+# plot(data, pch=NA, bty="n", axes=F) # initial plot (empty)
+# bg_grid_grey() # styling
+# points(data, pch=20, col="red") # actual data plot
