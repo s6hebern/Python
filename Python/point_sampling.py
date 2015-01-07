@@ -22,12 +22,12 @@ Created on Mon Dec 15 09:51:11 2014
             Takes only ogr.OFTInteger and ogr.OFTReal.
             
     precision: the precision of the output attribute field, if floating numbers
-            are desired. If not set, precision will not be set and may raise an
-            error.
+            are desired. If not specified, precision will be set to the length 
+            of the maximum value.
             
-    names: the field names of the output attribute fields, with a maximum lentgh
-            of 10 characters. If not set, the band names of the raster file will
-            be taken as field names.
+    names: the field names of the output attribute fields, with a maximum length
+            of 10 characters. If not specified, the band names of the raster 
+            file will be taken as field names.
 """
 
 from osgeo import ogr, gdal
@@ -40,14 +40,16 @@ def point_sampling(raster, shape, dataType, precision=None, names=None):
     raster = raster
     rst = gdal.Open(raster, GA_ReadOnly)
     bands = rst.RasterCount
+    xSize = rst.RasterXSize
+    ySize = rst.RasterYSize
     geotrans = rst.GetGeoTransform()
     xyOrigin = (geotrans[0], geotrans[3])
     pixWidth = geotrans[1]
     pixHeight = geotrans[5]
-    maxVal = int(round(rst.ReadAsArray().max()))
+    #maxVal = int(round(rst.ReadAsArray().max()))
     
     shape = shape
-    driver = ogr.GetDriverByName("ESRI Shapefile")
+    driver = ogr.GetDriverByName('ESRI Shapefile')
     shp = driver.Open(shape, 1)
     lyr = shp.GetLayer()
     
@@ -55,7 +57,7 @@ def point_sampling(raster, shape, dataType, precision=None, names=None):
     points = [(p.GetGeometryRef().GetX(), p.GetGeometryRef().GetY()) for p in lyr]
     
     # create field names from raster band names:
-    bandNames = sorted(rst.GetMetadata().values())[0:len(rst.GetMetadata().values())-1]
+    bandNames = sorted(rst.GetMetadata().values())[0:len(rst.GetMetadata().values())]
     fieldNames = []
     
     if names == None:
@@ -70,6 +72,9 @@ def point_sampling(raster, shape, dataType, precision=None, names=None):
     
     # loop through all bands, create fields and write values:
     for f in xrange(bands):
+        b = rst.GetRasterBand(f + 1)
+        maxVal = int(round(b.ReadAsArray(0, 0, xSize, ySize).max()))
+        b = None
         # check if fields already exist:
         if fieldNames[f] in lyr.GetFeature(0).keys():
             pass
