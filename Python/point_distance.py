@@ -1,110 +1,112 @@
 # -*- coding: utf-8 -*-
-'''
-Created on Mon Nov 17 11:21:48 2014
+"""
+Created on Mon Dec 15 09:51:11 2014
 
 @author: Hendrik
-'''
+"""
 
-''' Calculates the distance between the points in the source shapefile to the 
-    closest respective point in the target shapefile and writes the outcome into
-    a comma-separated csv file. '''
-
-def point_distance(source, target, source_id, target_id, csv):
-
-    from osgeo import ogr
-    import os
-    import math
-    import csv
+"""
+    Point sampling of a point shapefile and an image file. Creates a new 
+    attribute field for each raster band containing the values at the respective
+    point positions.
     
-    ### open shapefiles ###
-    print 'Reading data...'
+    Use:
     
-    source = source
-    target = target
-    
-    driver = ogr.GetDriverByName('ESRI Shapefile')
-    
-    source_shp = driver.Open(source, 0)
-    source_lyr = source_shp.GetLayer()
-    target_shp = driver.Open(target, 0)
-    target_lyr = target_shp.GetLayer()
-    
-    ### get feature coordinates ###
-    
-    source_coords = []
-    src_coords_append = source_coords.append()
-    target_coords = []
-    tgt_coords_append = target_coords.append()
-    
-    print 'Getting coordinates...'
-    
-    for i in xrange(source_lyr.GetFeatureCount()):
-        feat = source_lyr.GetFeature(i)
-        src_coords_append([feat.GetField(source_id), feat.geometry().GetX(), feat.geometry().GetX()])
-        feat = None
-        
-    for i in xrange(target_lyr.GetFeatureCount()):
-        feat = target_lyr.GetFeature(i)
-        tgt_coords_append([feat.GetField(target_id), feat.geometry().GetX(), feat.geometry().GetX()])
-        feat = None
-        
-    ### calculate distances and get minimum ###
-    
-    print 'Calculating distances...'
-    
-    out_list = []
-    out_list_append = out_list.append()
-    
-    for i in xrange(len(source_coords)):
-        id1 = source_coords[i][0]
-        x1 = source_coords[i][1]
-        y1 = source_coords[i][2]
-        
-        dist = []
-        dist_append = dist.append()
-        id2_list = []
-        id2_list_append = id2_list.append()
-        
-        for j in xrange(len(target_coords)):
-            id2 = target_coords[j][0]
-            x2 = target_coords[j][1]
-            y2 = target_coords[j][2]
-            id2_list_append(id2)
+    raster: the image file (full path and file extension), may contain multiple
+            bands.
             
-            ### calculation ###
-            dist_append(math.sqrt(((x1 - x2) **2) + ((y1 - y2) **2)))
-        
-        ### get minimum and coresponding indices ###
-        min_dist = min(dist)
-        min_id = id2_list[dist.index(min_dist)]
-        
-        out_list_append([id1, min_id, min_dist])
-        
-        ### create 'progress bar' ###
-        try:
-            import module_progress_bar as pr
-            pr.progress(i, xrange(len(source_coords)))
-        except:
+    shape: the shapefile (full path and file extension) containing the points at 
+            which positions the raster shall be sampled.
+            
+    dataType: the ogr data type of the output fields which shall be created. 
+            Takes only ogr.OFTInteger and ogr.OFTReal.
+            
+    precision: the precision of the output attribute field, if floating numbers
+            are desired. If not set, precision be set to the length of the 
+            maximum value.
+            
+    names: the field names of the output attribute fields, with a maximum length
+            of 10 characters. If not set, the band names of the raster file will
+            be taken as field names.
+"""
+
+from osgeo import ogr, gdal
+from gdalconst import *
+import os
+import numpy as np
+    
+def point_sampling(raster, shape, dataType, precision=None, names=None):
+
+    raster = raster
+    rst = gdal.Open(raster, GA_ReadOnly)
+    bands = rst.RasterCount
+    xSize = rst.RasterXSize
+    ySize = rst.RasterYSize
+    geotrans = rst.GetGeoTransform()
+    xyOrigin = (geotrans[0], geotrans[3])
+    pixWidth = geotrans[1]
+    pixHeight = geotrans[5]
+    #maxVal = int(round(rst.ReadAsArray().max()))
+    
+    shape = shape
+    driver = ogr.GetDriverByName("ESRI Shapefile")
+    shp = driver.Open(shape, 1)
+    lyr = shp.GetLayer()
+    
+    # get points:
+    points = [(p.GetGeometryRef().GetX(), p.GetGeometryRef().GetY()) for p in lyr]
+    
+    # create field names from raster band names:
+    bandNames = sorted(rst.GetMetadata().values())[0:len(rst.GetMetadata().values())]
+    fieldNames = []
+    
+    if names == None:
+        # fields in shapefiles may contain a maximum of 10 characters:
+        for name in bandNames:
+            if len(name) > 10:
+                fieldNames.append(name[0:10])
+            else:
+                fieldNames.append(name)
+    else:
+        fieldNames = names
+    
+    # loop through all bands, create fields and write values:
+    for f in xrange(bands):
+        b = rst.GetRasterBand(f + 1)
+        maxVal = int(round(b.ReadAsArray(0, 0, xSize, ySize).max()))
+        b = None
+        # check if fields already exist:
+        if fieldNames[f] in lyr.GetFeature(0).keys():
             pass
-    
-    source = None
-    target = None
-    
-    ### create output file as csv ###
-    
-    print 'Writing output...'
-    
-    outfile = csv
-    
-    if os.path.exists(outfile):
-        os.remove(outfile)
-    
-    header = [source_id, target_id, 'DIST']
-    with open(outfile, 'wb') as csvfile:
-        writer = csv.writer(csvfile, delimiter = ',')
-        writer.writerow(header)
-        writer.writerows(out_list)
+        else:
+            field = ogr.FieldDefn(fieldNames[f], dataType)
+            if precision == None:
+                field.SetWidth(len(str(maxVal)))
+            else:
+                field.SetWidth(len(str(maxVal)) + precision + 1)
+                field.SetPrecision(precision)
+            lyr.CreateField(field)
         
-    csvfile.close()
+        # loop through all points and get values:
+        for point in xrange(len(points)):
+            # compute offset:
+            xOff = int((points[point][0] - xyOrigin[0]) / pixWidth)
+            yOff = int((points[point][1] - xyOrigin[1]) / pixHeight)
+            # get band:
+            band = rst.GetRasterBand(f + 1)
+            data = band.ReadAsArray(xOff, yOff, 1, 1)
+            if dataType == ogr.OFTInteger:
+                val = int(data[0, 0])
+            elif dataType == ogr.OFTReal:
+                val = float(data[0, 0])
+            else:
+                raise(Warning('Invalid Data Type assigned! Function takes only ogr.OFTInteger and ogr.OFTReal'))
+            # set value:
+            feat = lyr.GetFeature(point)
+            feat.SetField(fieldNames[f], val)
+            lyr.SetFeature(feat)
+            feat = None
     
-    print 'Done!'
+    rst = None
+    lyr = None
+    shp = None
