@@ -27,13 +27,16 @@ Created on Mon Dec 15 09:51:11 2014
             
     names: the field names of the output attribute fields, with a maximum length
             of 10 characters. If not specified, the band names of the raster 
-            file will be taken as field names.
+            file will be taken as field names. If they contain characters which
+            are not in the following list, those characters will be deleted.
+            (a-z, A-Z, 0-9, _, -)
 """
 
 from osgeo import ogr, gdal
 from gdalconst import *
 import os
 import numpy as np
+import re
     
 def point_sampling(raster, shape, dataType, precision=None, names=None):
 
@@ -58,6 +61,9 @@ def point_sampling(raster, shape, dataType, precision=None, names=None):
     
     # create field names from raster band names:
     bandNames = sorted(rst.GetMetadata().values())[0:len(rst.GetMetadata().values())]
+    # delete characters which are not in the following list:
+    bandNames = [re.sub(r'[^a-zA-Z0-9_-]', r'', i) for i in bandNames]
+    
     fieldNames = []
     
     if names == None:
