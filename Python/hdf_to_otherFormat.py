@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Sat Jan 10 16:54:20 2015
-
-@author: Hendrik
-"""
 
 """
     Converting hdf format (used by e.g. USGS to distribute MODIS images) to 
@@ -63,8 +58,6 @@ def get_subdatasets(dataset, consoleOut=False):
                 number += 1
                 print number, ':', sdsdict[k]
     return [sdsdict[k] for k in sdsdict.keys() if '_NAME' in k]
-
-
     source = None
 
 # main function:    
