@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Dec 15 09:51:11 2014
-
-@author: Hendrik
-"""
 
 """
     Point sampling of a point shapefile and an image file. Creates a new 
