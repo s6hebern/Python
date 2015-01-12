@@ -74,7 +74,9 @@ def point_sampling(raster, shape, dataType, precision=None, names=None):
     # loop through all bands, create fields and write values:
     for f in xrange(bands):
         b = rst.GetRasterBand(f + 1)
-        maxVal = int(round(b.ReadAsArray(0, 0, xSize, ySize).max()))
+        # check for invalid values:
+        maxVal = int(round(np.nanmax(np.ma.masked_invalid(b.ReadAsArray(0, 0, \
+                                                            xSize, ySize)))))
         b = None
         # check if fields already exist:
         if fieldNames[f] in lyr.GetFeature(0).keys():
