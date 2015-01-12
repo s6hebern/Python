@@ -57,8 +57,8 @@ def get_subdatasets(dataset, consoleOut=False):
             if '_NAME' in k:
                 number += 1
                 print number, ':', sdsdict[k]
-    return [sdsdict[k] for k in sdsdict.keys() if '_NAME' in k]
     source = None
+    return [sdsdict[k] for k in sdsdict.keys() if '_NAME' in k]
 
 # main function:    
 def hdf2other(hdf, hdfLayer, outPath=None, outName=None, outFormat='GTiff', \
