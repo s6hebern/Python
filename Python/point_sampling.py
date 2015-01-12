@@ -44,7 +44,6 @@ def point_sampling(raster, shape, dataType, precision=None, names=None):
     xyOrigin = (geotrans[0], geotrans[3])
     pixWidth = geotrans[1]
     pixHeight = geotrans[5]
-    #maxVal = int(round(rst.ReadAsArray().max()))
     
     shape = shape
     driver = ogr.GetDriverByName('ESRI Shapefile')
