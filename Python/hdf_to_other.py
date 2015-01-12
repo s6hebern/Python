@@ -61,7 +61,7 @@ def get_subdatasets(dataset, consoleOut=False):
     return [sdsdict[k] for k in sdsdict.keys() if '_NAME' in k]
 
 # main function:    
-def hdf2other(hdf, hdfLayer, outPath=None, outName=None, outFormat='GTiff', \
+def hdf_to_other(hdf, hdfLayer, outPath=None, outName=None, outFormat='GTiff', \
                 outFileExtension='.tif'):
      
     # open hdf:
