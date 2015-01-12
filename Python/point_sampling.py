@@ -32,6 +32,11 @@ from gdalconst import *
 import os
 import numpy as np
 import re
+
+try:
+    import module_progress_bar as pr
+except:
+    pass
     
 def point_sampling(raster, shape, dataType, precision=None, names=None):
 
@@ -54,7 +59,7 @@ def point_sampling(raster, shape, dataType, precision=None, names=None):
     points = [(p.GetGeometryRef().GetX(), p.GetGeometryRef().GetY()) for p in lyr]
     
     # create field names from raster band names:
-    bandNames = sorted(rst.GetMetadata().values())[0:len(rst.GetMetadata().values())]
+    bandNames = sorted(rst.GetMetadata().values())[1:len(rst.GetMetadata().values())]
     # delete characters which are not in the following list:
     bandNames = [re.sub(r'[^a-zA-Z0-9_-]', r'', i) for i in bandNames]
     
@@ -72,16 +77,19 @@ def point_sampling(raster, shape, dataType, precision=None, names=None):
     
     # loop through all bands, create fields and write values:
     for f in xrange(bands):
+        
+        pr.progress(f, xrange(bands))
+        
         b = rst.GetRasterBand(f + 1)
         # check for invalid values:
         maxVal = int(round(np.nanmax(np.ma.masked_invalid(b.ReadAsArray(0, 0, \
                                                             xSize, ySize)))))
         b = None
         # check if fields already exist:
-        if fieldNames[f] in lyr.GetFeature(0).keys():
+        if str(fieldNames[f]) in lyr.GetFeature(0).keys():
             pass
         else:
-            field = ogr.FieldDefn(fieldNames[f], dataType)
+            field = ogr.FieldDefn(str(fieldNames[f]), dataType)
             if precision == None:
                 field.SetWidth(len(str(maxVal)))
             else:
@@ -105,7 +113,7 @@ def point_sampling(raster, shape, dataType, precision=None, names=None):
                 raise(Warning('Invalid Data Type assigned! Function takes only ogr.OFTInteger and ogr.OFTReal'))
             # set value:
             feat = lyr.GetFeature(point)
-            feat.SetField(fieldNames[f], val)
+            feat.SetField(str(fieldNames[f]), val)
             lyr.SetFeature(feat)
             feat = None
     
