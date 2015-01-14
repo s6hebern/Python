@@ -3,7 +3,8 @@
 """
     Point sampling of a point shapefile and an image file. Creates a new 
     attribute field for each raster band containing the values at the respective
-    point positions.
+    point positions or the desired statistical value within a window around 
+    these positions.
     
     Use:
     
@@ -14,17 +15,29 @@
             which positions the raster shall be sampled.
             
     dataType: the ogr data type of the output fields which shall be created. 
-            Takes only ogr.OFTInteger and ogr.OFTReal.
+            Takes only ogr.OFTInteger (default) and ogr.OFTReal.
+            
+    winRad: the radius of the window around the respective point position. For
+            example, a value of 4 will create a window of 8x8 pixels (4 pixels
+            to each direction). If not specified, no window will be used and the
+            value will be taken from the exact point position.
+            
+    mode: the statistical value which shall be taken from the window, given as
+            string. Possible values are:
+                - 'median' (default)
+                - 'mean'
+                - 'min'
+                - 'max'
             
     precision: the precision of the output attribute field, if floating numbers
             are desired. If not specified, precision will be set to the length 
             of the maximum value.
             
     names: the field names of the output attribute fields, with a maximum length
-            of 10 characters. If not specified, the band names of the raster 
-            file will be taken as field names. If they contain characters which
-            are not in the following list, those characters will be deleted.
-            (a-z, A-Z, 0-9, _, -)
+            of 10 characters, given as a list. If not specified, the band names 
+            of the raster file will be taken as field names. If they contain 
+            characters which are not within (a-z, A-Z, 0-9, _, -) those will be 
+            deleted.
 """
 
 from osgeo import ogr, gdal
@@ -38,7 +51,7 @@ try:
 except:
     pass
     
-def point_sampling(raster, shape, dataType, precision=None, names=None):
+def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='median', precision=None, names=None):
 
     raster = raster
     rst = gdal.Open(raster, GA_ReadOnly)
@@ -59,9 +72,10 @@ def point_sampling(raster, shape, dataType, precision=None, names=None):
     points = [(p.GetGeometryRef().GetX(), p.GetGeometryRef().GetY()) for p in lyr]
     
     # create field names from raster band names:
-    bandNames = sorted(rst.GetMetadata().values())[1:len(rst.GetMetadata().values())]
+    bandNames = sorted(rst.GetMetadata().values())
+    bandNames.remove('Area')
     # delete characters which are not in the following list:
-    bandNames = [re.sub(r'[^a-zA-Z0-9_-]', r'', i) for i in bandNames]
+    bandNames = [re.sub(r'[^a-zA-Z0-9_-]', r'', str(i)) for i in bandNames]
     
     fieldNames = []
     
@@ -73,7 +87,7 @@ def point_sampling(raster, shape, dataType, precision=None, names=None):
             else:
                 fieldNames.append(name)
     else:
-        fieldNames = names
+        fieldNames = [re.sub(r'[^a-zA-Z0-9_-]', r'', str(i)) for i in names]
     
     # loop through all bands, create fields and write values:
     for f in xrange(bands):
@@ -104,11 +118,32 @@ def point_sampling(raster, shape, dataType, precision=None, names=None):
             yOff = int((points[point][1] - xyOrigin[1]) / pixHeight)
             # get band:
             band = rst.GetRasterBand(f + 1)
-            data = band.ReadAsArray(xOff, yOff, 1, 1)
-            if dataType == ogr.OFTInteger:
-                val = int(data[0, 0])
-            elif dataType == ogr.OFTReal:
-                val = float(data[0, 0])
+            noData = band.GetNoDataValue()
+            # get value at the desired position (or window):
+            if winRad == 0:
+                data = band.ReadAsArray(xOff, yOff, 1, 1)
+            else:
+                if mode == 'median':
+                    data = np.median(np.ma.masked_invalid(band.ReadAsArray( \
+                            xOff - winRad, yOff - winRad, winRad * 2, winRad * 2)))
+                elif mode == 'mean':
+                    data = np.nanmean(np.ma.masked_invalid(band.ReadAsArray( \
+                            xOff - winRad, yOff - winRad, winRad * 2, winRad * 2)))
+                elif mode == 'min':
+                    data = np.nanmin(np.ma.masked_invalid(band.ReadAsArray( \
+                            xOff - winRad, yOff - winRad, winRad * 2, winRad * 2)))
+                elif mode == 'max':
+                    data = np.nanmax(np.ma.masked_invalid(band.ReadAsArray( \
+                            xOff - winRad, yOff - winRad, winRad * 2, winRad * 2)))
+                                                    
+            if dataType == ogr.OFTInteger and data != None:
+                val = int(data)
+            elif dataType == ogr.OFTInteger and data == None:
+                val = int(noData)
+            elif dataType == ogr.OFTReal and data != None:
+                val = float(data)
+            elif dataType == ogr.OFTReal and data == None:
+                val = int(noData)
             else:
                 raise(Warning('Invalid Data Type assigned! Function takes only ogr.OFTInteger and ogr.OFTReal'))
             # set value:
