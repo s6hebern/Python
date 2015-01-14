@@ -19,7 +19,7 @@
     
     pattern: pattern to look for in the file names as a list. May be useful, if 
             there are many files from which only a selection shall be taken.
-            Example:    
+            Examples:    
                 pattern='.txt' (if all txt-files are desired)
                 pattern='_mean' (if all desired files include that 
                                         particular string in the name)
