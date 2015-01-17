@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from osgeo import ogr, gdal
-from gdalconst import *
+from osgeo.gdalconst import *
 import os
 import numpy as np
 import re
