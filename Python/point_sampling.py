@@ -91,8 +91,11 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='media
     
     # loop through all bands, create fields and write values:
     for f in xrange(bands):
-        
-        pr.progress(f, xrange(bands))
+        # progress bar:
+        try:
+            pr.progress(f, xrange(bands))
+        except:
+            pass
         
         b = rst.GetRasterBand(f + 1)
         # check for invalid values:
