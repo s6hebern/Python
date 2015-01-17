@@ -1,6 +1,38 @@
 # -*- coding: utf-8 -*-
 
-"""
+import sys
+from osgeo import gdal
+from osgeo.gdalconst import *
+from osgeo import gdal_array
+import os
+import numpy
+
+# define function for getting the hdf layer-names:
+def get_subdatasets(dataset, consoleOut=False):
+    
+    """
+        get_subdataasets: function to get the layer names of the hdf file. Takes 
+        the hdf file (with full path and file extension) as an argument. If 
+        'consoleOut' is set 'True', all layer names will be listed in the 
+        console.
+    """
+    
+    source = gdal.Open(dataset, GA_ReadOnly)
+    sdsdict = source.GetMetadata('SUBDATASETS')
+    if consoleOut == True:
+        number = 0
+        print 'Subdatasets of', os.path.split(dataset)[1], ':'
+        for k in sdsdict.keys():
+            if '_NAME' in k:
+                number += 1
+                print number, ':', sdsdict[k]
+    source = None
+    return [sdsdict[k] for k in sdsdict.keys() if '_NAME' in k]
+
+# main function:    
+def hdf_to_other(hdf, hdfLayer, outPath=None, outName=None, outFormat='GTiff', outFileExtension='.tif'):
+    
+    """
     Converting hdf format (used by e.g. USGS to distribute MODIS images) to 
     other image format.
     
@@ -37,32 +69,7 @@
             
     outFileExtension: the file extension of the output file (ENVI format has ""). 
             If not specified, '.tif' will be used.
-"""
-
-import sys
-from osgeo import gdal
-from osgeo.gdalconst import *
-from osgeo import gdal_array
-import os
-import numpy
-
-# define function for getting the hdf layer-names:
-def get_subdatasets(dataset, consoleOut=False):
-    source = gdal.Open(dataset, GA_ReadOnly)
-    sdsdict = source.GetMetadata('SUBDATASETS')
-    if consoleOut == True:
-        number = 0
-        print 'Subdatasets of', os.path.split(dataset)[1], ':'
-        for k in sdsdict.keys():
-            if '_NAME' in k:
-                number += 1
-                print number, ':', sdsdict[k]
-    source = None
-    return [sdsdict[k] for k in sdsdict.keys() if '_NAME' in k]
-
-# main function:    
-def hdf_to_other(hdf, hdfLayer, outPath=None, outName=None, outFormat='GTiff', \
-                outFileExtension='.tif'):
+    """
      
     # open hdf:
     source = gdal.Open(hdf, GA_ReadOnly)
