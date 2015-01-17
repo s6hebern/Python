@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 
-"""
+import os
+import ftplib
+
+def ftp_download(server, serverPath, user='', pw='', localPath=os.getcwd(), pattern=None):
+    
+    """
     Download files from a ftp-server.
     
     Use:
@@ -13,22 +18,18 @@
     user: 'Username' for server login.
     
     pw: 'Password' for server login.
-            
+    
     localPath: the local directory, to which the files shall be downloaded, as a
             string. Defaults to the current working directory.
     
     pattern: pattern to look for in the file names as a list. May be useful, if 
             there are many files from which only a selection shall be taken.
-            Examples:
+            Examples:    
                 pattern='.txt' (if all txt-files are desired)
                 pattern='_mean' (if all desired files include that 
                                         particular string in the name)
-"""
+    """
 
-import os
-import ftplib
-
-def ftp_download(server, serverPath, user='', pw='', localPath=os.getcwd(), pattern=None):
     if server.__contains__('ftp://'):
         server = server.strip('ftp://')
     # set up connection:
