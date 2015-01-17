@@ -1,19 +1,39 @@
 # -*- coding: utf-8 -*-
 
-''' 
-    Calculates the distance between the points in the source shapefile to the 
-    closest respective point in the target shapefile and writes the outcome into
-    a comma-separated csv file. 
-'''
+import os
+import math
+import csv
+from osgeo import ogr
+
+try:
+    import module_progress_bar as pr
+except:
+    pass
 
 def point_distance(source, target, source_id, target_id, csv):
 
-    from osgeo import ogr
-    import os
-    import math
-    import csv
+    ''' 
+    Calculates the distance between the points in the source shapefile to the 
+    closest respective point in the target shapefile and writes the outcome into
+    a comma-separated csv file.
     
-    ### open shapefiles ###
+    Use:
+    
+    source (string): the source shapefile (full path and file extension).
+    
+    target (string):the target shapefile (full path and file extension).
+    
+    source_id (string): the name of the attribute field which contains the 
+            unique ID for each point whithin the source shapefile.
+    
+    target_id (string): the name of the attribute field which contains the 
+            unique ID for each point whithin the target shapefile.
+    
+    csv (string): the output csv file (full path and file extension).
+    
+    '''
+
+    # open shapefiles:
     print 'Reading data...'
     
     source = source
@@ -26,8 +46,7 @@ def point_distance(source, target, source_id, target_id, csv):
     target_shp = driver.Open(target, 0)
     target_lyr = target_shp.GetLayer()
     
-    ### get feature coordinates ###
-    
+    # get feature coordinates:
     source_coords = []
     src_coords_append = source_coords.append()
     target_coords = []
@@ -45,8 +64,7 @@ def point_distance(source, target, source_id, target_id, csv):
         tgt_coords_append([feat.GetField(target_id), feat.geometry().GetX(), feat.geometry().GetX()])
         feat = None
         
-    ### calculate distances and get minimum ###
-    
+    # calculate distances and get minimum:
     print 'Calculating distances...'
     
     out_list = []
@@ -68,18 +86,17 @@ def point_distance(source, target, source_id, target_id, csv):
             y2 = target_coords[j][2]
             id2_list_append(id2)
             
-            ### calculation ###
+            # calculation:
             dist_append(math.sqrt(((x1 - x2) **2) + ((y1 - y2) **2)))
         
-        ### get minimum and coresponding indices ###
+        # get minimum and coresponding indices:
         min_dist = min(dist)
         min_id = id2_list[dist.index(min_dist)]
         
         out_list_append([id1, min_id, min_dist])
         
-        ### create 'progress bar' ###
+        # get progress bar:
         try:
-            import module_progress_bar as pr
             pr.progress(i, xrange(len(source_coords)))
         except:
             pass
@@ -87,10 +104,8 @@ def point_distance(source, target, source_id, target_id, csv):
     source = None
     target = None
     
-    ### create output file as csv ###
-    
+    # create output file as csv:
     print 'Writing output...'
-    
     outfile = csv
     
     if os.path.exists(outfile):
