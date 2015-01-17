@@ -1,40 +1,35 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Dec 05 13:45:23 2014
 
-@author: Hendrik
-"""
+from osgeo import ogr
+import os
+try:
+    import module_progress_bar as pr
+except:
+    pass
 
-""" 
+def spatial_join(shapes, out_shape, fields = None, out_fields = None):
+
+    """ 
     Spatial join of two or more point shapefiles. Writes a new shapefile
     cotaining the common points and one attribute field from each shapefile. 
     
     Use:
     
-    shapes: a LIST of the input shapefiles, given as strings (full path and 
-            file extension).
+    shapes (list): a list of the input shapefiles, each given as strings (full 
+            path and file extension).
             
-    out_shape: the name of the output shapefile (full path and file extension).
+    out_shape (string): the name of the output shapefile (full path and file 
+            extension).
     
-    fields: a LIST of the desired attribute fields to keep, given as strings, in
-            the same order as the input shapefiles. If more than one field shall
-            be kept, use a TUPLE of strings for the respective shapefile. If not
-            set, no attribute fields will be written except for an ID field.
+    fields (list): a list of the desired attribute fields to keep, given as 
+            strings, in the same order as the input shapefiles. If more than one 
+            field shall be kept, use a TUPLE of strings for the respective 
+            shapefile. Defaults to no attribute fields except for an ID field.
             
-    out_fields: a LIST of names for the desired output attribute fields. If not
-            set, field names will be the same as in the input shapefiles (which
-            may be confusing, if field names are the same in two or more 
-            shapefiles).
-"""
-
-def spatial_join(shapes, out_shape, fields = None, out_fields = None):
-    from osgeo import ogr
-#    import collections as coll
-    import os
-    try:
-        import module_progress_bar as pr
-    except:
-        pass
+    out_fields (list): a list of names for the desired output attribute fields. 
+            Defaults to the names of the input shapefiles (which may be 
+            confusing, if field names are the same in two or more shapefiles).
+    """
     
     driver = ogr.GetDriverByName('ESRI Shapefile')
     
@@ -128,7 +123,6 @@ def spatial_join(shapes, out_shape, fields = None, out_fields = None):
     
             else:
                 for fld in xrange(len(fields[shape])):
-                    #print 'Field', fld + 1, 'of', len(fields[shape])
                     attr_append([])
                     at_append = attr[counter].append
                     
