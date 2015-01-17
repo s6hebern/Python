@@ -1,6 +1,19 @@
 # -*- coding: utf-8 -*-
 
-"""
+from osgeo import ogr, gdal
+from gdalconst import *
+import os
+import numpy as np
+import re
+
+try:
+    import module_progress_bar as pr
+except:
+    pass
+    
+def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='median', precision=None, names=None):
+    
+    """
     Point sampling of a point shapefile and an image file. Creates a new 
     attribute field for each raster band containing the values at the respective
     point positions or the desired statistical value within a window around 
@@ -38,20 +51,7 @@
             of the raster file will be taken as field names. If they contain 
             characters which are not within (a-z, A-Z, 0-9, _, -) those will be 
             deleted.
-"""
-
-from osgeo import ogr, gdal
-from gdalconst import *
-import os
-import numpy as np
-import re
-
-try:
-    import module_progress_bar as pr
-except:
-    pass
-    
-def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='median', precision=None, names=None):
+    """
 
     raster = raster
     rst = gdal.Open(raster, GA_ReadOnly)
@@ -91,11 +91,8 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='media
     
     # loop through all bands, create fields and write values:
     for f in xrange(bands):
-        # progress bar:
-        try:
-            pr.progress(f, xrange(bands))
-        except:
-            pass
+        
+        pr.progress(f, xrange(bands))
         
         b = rst.GetRasterBand(f + 1)
         # check for invalid values:
