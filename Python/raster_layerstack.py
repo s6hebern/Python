@@ -95,7 +95,12 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', createOpti
     # loop through all files and stack them:
     band_index = 1
     for name in files:
-        pr.progress(name, files)
+        # progress bar:
+        try:
+            pr.progress(name, files)
+        except:
+            pass
+        
         if outPath == None:
             ds = gdal.Open(os.path.join(path, name), GA_ReadOnly)
         else:
