@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
-""" 
+def progress(iterator, iterable):
+
+    """ 
     Generates a numerical progress bar of five-percent-steps. Function has to be 
     called within the loop. 
     
@@ -9,9 +11,8 @@
     iterator: the iterator of the loop.
     
     iterable: the iterable object to which the loop is applied.
-"""
+    """
 
-def progress(iterator, iterable):
     iterator = iterable.index(iterator)
     iterable = xrange(len(iterable))
     
