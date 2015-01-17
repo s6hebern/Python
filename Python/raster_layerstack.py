@@ -20,7 +20,7 @@
             options such as band interleave.
             
             Example:
-                createOtpions=['interleave=bil']
+                createOptions=['interleave=bil']
                 
     bandNames (list): a list of band names for the output file. Defaults to the
             names of the input files.
@@ -65,9 +65,8 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', createOpti
     driver = gdal.GetDriverByName(outFormat)
     
     if createOptions != None:
-        create_options = createOptions
         ds_out = driver.Create(outName, ds.RasterXSize, ds.RasterYSize,
-                               len(files), band.DataType, create_options)
+                               len(files), band.DataType, createOptions)
     else:
         ds_out = driver.Create(outName, ds.RasterXSize, ds.RasterYSize,
                                len(files), band.DataType)
