@@ -21,36 +21,36 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='media
     
     Use:
     
-    raster: the image file (full path and file extension), may contain multiple
-            bands.
+    raster (string): the image file (full path and file extension).
             
-    shape: the shapefile (full path and file extension) containing the points at 
-            which positions the raster shall be sampled.
+    shape (string): the shapefile (full path and file extension) containing the 
+            points at which positions the raster shall be sampled.
             
-    dataType: the ogr data type of the output fields which shall be created. 
-            Takes only ogr.OFTInteger (default) and ogr.OFTReal.
+    dataType (ogr DataType): the ogr data type of the output fields which shall 
+            be created. Takes only ogr.OFTInteger (default) and ogr.OFTReal.
             
-    winRad: the radius of the window around the respective point position. For
-            example, a value of 4 will create a window of 8x8 pixels (4 pixels
-            to each direction). If not specified, no window will be used and the
-            value will be taken from the exact point position.
+    winRad (integer): the radius of the window around the respective point 
+            position. For example, a value of 4 will create a window of 8x8 
+            pixels (4 pixels to each direction). If not specified, no window 
+            will be used and the value will be taken from the exact point 
+            position.
             
-    mode: the statistical value which shall be taken from the window, given as
-            string. Possible values are:
+    mode (string): the statistical value which shall be taken from the window. 
+            Possible values are:
                 - 'median' (default)
                 - 'mean'
                 - 'min'
                 - 'max'
             
-    precision: the precision of the output attribute field, if floating numbers
-            are desired. If not specified, precision will be set to the length 
-            of the maximum value.
+    precision (integer): the precision of the output attribute field, if 
+            floating numbers are desired. If not specified, precision will be 
+            set to the length of the maximum value.
             
-    names: the field names of the output attribute fields, with a maximum length
-            of 10 characters, given as a list. If not specified, the band names 
-            of the raster file will be taken as field names. If they contain 
-            characters which are not within (a-z, A-Z, 0-9, _, -) those will be 
-            deleted.
+    names (list): a list of the field names for the output attribute fields, 
+            with a maximum length of 10 characters. If not specified, the band 
+            names of the raster file will be taken as field names. If they 
+            contain characters which are not within (a-z, A-Z, 0-9, _, -) those 
+            will be deleted.
     """
 
     raster = raster
