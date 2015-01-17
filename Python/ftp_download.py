@@ -10,20 +10,23 @@ def ftp_download(server, serverPath, user='', pw='', localPath=os.getcwd(), patt
     
     Use:
     
-    server: the base adress of the ftp-server as a string.
+    server (string): the base adress of the ftp-server (without any links, just
+            the basic adress of the main page (top level domain)).
     
-    serverPath: the path within the servers file structure, which is the rest of
-            the whole url after the top level domain ('.com', '.gov', etc.).
+    serverPath (string): the path within the servers file structure, which is 
+            the rest of the whole url after the top level domain ('.com', 
+            '.gov', etc.).
     
-    user: 'Username' for server login.
+    user (string): 'Username' for server login.
     
-    pw: 'Password' for server login.
+    pw (string): 'Password' for server login.
     
-    localPath: the local directory, to which the files shall be downloaded, as a
-            string. Defaults to the current working directory.
+    localPath (string): the local directory, to which the files shall be 
+            downloaded. Defaults to the current working directory.
     
-    pattern: pattern to look for in the file names as a list. May be useful, if 
-            there are many files from which only a selection shall be taken.
+    pattern (list): a lit of string containing the pattern of characters to look 
+            for in the file names as a list. May be useful, if there are many 
+            files from which only a selection shall be taken.
             Examples:    
                 pattern='.txt' (if all txt-files are desired)
                 pattern='_mean' (if all desired files include that 
