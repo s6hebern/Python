@@ -8,19 +8,15 @@ try:
 except:
     pass
 
-def ftp_download(server, serverPath, user='', pw='', localPath=os.getcwd(), pattern=None):
+def ftp_download(url, user='', pw='', localPath=os.getcwd(), pattern=None):
     
     """
     Download files from a ftp-server. Can handle one level of subfolders.
     
     Use:
     
-    server (string): the base adress of the ftp-server (without any links, just
-            the basic adress of the main page (top level domain)).
-    
-    serverPath (string): the path within the servers file structure, which is 
-            the rest of the whole url after the top level domain ('.com', 
-            '.gov', etc.).
+    url (string): the complete url of the ftp-server containing the desired 
+            files.
     
     user (string): 'Username' for server login.
     
@@ -38,13 +34,13 @@ def ftp_download(server, serverPath, user='', pw='', localPath=os.getcwd(), patt
                                         particular string in the name)
     """
 
-    if server.__contains__('ftp://'):
-        server = server.split('//')[1]
+    if url.__contains__('ftp://'):
+        url = url.split('//')[1]
     # set up connection:
-    ftp = ftplib.FTP(server)
+    ftp = ftplib.FTP(url.split('/')[0])
     ftp.login(user, pw)
     # switch directory on server:
-    root = serverPath
+    root = url.lstrip(url.split('/')[0])
     ftp.cwd(root)
     # list all files and/or directories:
     listing = []
@@ -52,6 +48,11 @@ def ftp_download(server, serverPath, user='', pw='', localPath=os.getcwd(), patt
 
     # loop through the current directory and get the files:
     for l in listing:
+        try:
+            pr.progress(l, listing)
+        except:
+            pass
+        
         if l[-4] == '.':
             # check for desired pattern:
             if pattern == None:
@@ -95,10 +96,3 @@ def ftp_download(server, serverPath, user='', pw='', localPath=os.getcwd(), patt
             ftp.cwd(root)
 
     ftp.close()
-
-##------------------------------------------------------------------------------
-## Example:
-#
-#pat = ['_' + str(i) for i in xrange(2001, 2015)]        
-#ftp_download('ftp-cdc.dwd.de', 'pub/CDC/grids_germany/monthly/air_temperature_mean', \
-#    localPath=r'D:\Uni\Masterarbeit\climate\airtemp_monthly', pattern=pat)
