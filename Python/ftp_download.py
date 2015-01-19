@@ -3,10 +3,15 @@
 import os
 import ftplib
 
+try:
+    import module_progress_bar as pr
+except:
+    pass
+
 def ftp_download(server, serverPath, user='', pw='', localPath=os.getcwd(), pattern=None):
     
     """
-    Download files from a ftp-server.
+    Download files from a ftp-server. Can handle one level of subfolders.
     
     Use:
     
@@ -34,47 +39,66 @@ def ftp_download(server, serverPath, user='', pw='', localPath=os.getcwd(), patt
     """
 
     if server.__contains__('ftp://'):
-        server = server.strip('ftp://')
+        server = server.split('//')[1]
     # set up connection:
     ftp = ftplib.FTP(server)
     ftp.login(user, pw)
     # switch directory on server:
     root = serverPath
     ftp.cwd(root)
-    # list all files and / or directories:
+    # list all files and/or directories:
     listing = []
     ftp.retrlines('NLST', listing.append)
+
     # loop through the current directory and get the files:
     for l in listing:
-        # get file names:
-        files = []
-        ftp.cwd(l)
-        ftp.retrlines('NLST', files.append)
-        # check for desired pattern:
-        if pattern == None:
-            for f in files:
+        if l[-4] == '.':
+            # check for desired pattern:
+            if pattern == None:
                 # download files:
-                local_filename = os.path.join(localPath, f)
+                local_filename = os.path.join(localPath, l)
                 lf = open(local_filename, 'wb')
-                ftp.retrbinary('RETR ' + f, lf.write)
+                ftp.retrbinary('RETR ' + l, lf.write)
                 lf.close()
+            else:
+                for p in pattern:
+                    # download files:
+                    if l.__contains__(str(p)):
+                        local_filename = os.path.join(localPath, l)
+                        lf = open(local_filename, 'wb')
+                        ftp.retrbinary('RETR ' + l, lf.write)
+                        lf.close()
         else:
-            for p in pattern:
+            # get file names:
+            files = []
+            ftp.cwd(l)
+            ftp.retrlines('NLST', files.append)
+            # check for desired pattern:
+            if pattern == None:
                 for f in files:
                     # download files:
-                    if f.__contains__(p):
-                        local_filename = os.path.join(localPath, f)
-                        lf = open(local_filename, 'wb')
-                        ftp.retrbinary('RETR ' + f, lf.write)
-                        lf.close()
-    
-        ftp.cwd('/..')
-        ftp.cwd(root)
+                    local_filename = os.path.join(localPath, f)
+                    lf = open(local_filename, 'wb')
+                    ftp.retrbinary('RETR ' + f, lf.write)
+                    lf.close()
+            else:
+                for p in pattern:
+                    for f in files:
+                        # download files:
+                        if f.__contains__(str(p)):
+                            local_filename = os.path.join(localPath, f)
+                            lf = open(local_filename, 'wb')
+                            ftp.retrbinary('RETR ' + f, lf.write)
+                            lf.close()
+        
+            ftp.cwd('/..')
+            ftp.cwd(root)
 
+    ftp.close()
 
 ##------------------------------------------------------------------------------
 ## Example:
 #
 #pat = ['_' + str(i) for i in xrange(2001, 2015)]        
 #ftp_download('ftp-cdc.dwd.de', 'pub/CDC/grids_germany/monthly/air_temperature_mean', \
-#    r'D:\Uni\Masterarbeit\climate\airtemp_monthly', pattern=pat)
+#    localPath=r'D:\Uni\Masterarbeit\climate\airtemp_monthly', pattern=pat)
