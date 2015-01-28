@@ -33,9 +33,6 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, outPa
             Defaults to 'GTiFF'.
     """
     
-#    if len(values) > 2:
-#        raise ValueError('Argument "values" takes 2 entries at most! Got more!')
-    
     import os
     import sys
     import string
