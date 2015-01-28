@@ -1,17 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import os
-import sys
-import string
-from osgeo import gdal
-from osgeo.gdalconst import *
-
-try:
-    import module_progress_bar as pr
-except:
-    pass
-
-def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', createOptions=None, bandNames=None, searchString=None):
+def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, dataType=None, createOptions=None, bandNames=None, searchString=None):
     
     """
     Create a layerstack from all files within a directory.
@@ -22,12 +11,19 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', createOpti
     
     outName (string): the name of the output file.
     
-    outPath (string): the directory too which the output file will be written. 
+    outPath (string): the directory to which the output file will be written. 
             Defaults to the directory given in 'path'.
     
     outFormat (string): the desired format of the output file as provided by the 
             GDAL raster formats (see: http://www.gdal.org/formats_list.html). 
             Defaults to 'GTiFF'.
+    
+    noData (int / float): the no-data value to be set. Defaults to the no-data 
+            value of the first input file.
+    
+    dataType (int): the desired data type of the output image, as provided by
+            the GDAL data types (http://www.gdal.org/gdal_8h.html under 
+            'Enumerations'). Defaults to the data type of the input images.
     
     createOptions (list): a list of strings, containing advanced raster creation 
             options such as band interleave.
@@ -43,7 +39,18 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', createOpti
             extensions). May be useful, if 'path' contains also other files 
             which shall or can not be used by this function.
     """    
-     
+
+    import os
+    import sys
+    import string
+    from osgeo import gdal
+    from osgeo.gdalconst import *
+    
+    try:
+        import module_progress_bar as pr
+    except:
+        pass
+
     # check if outfile exists and delete it:
     if outPath == None:
         if outName in os.listdir(path):
@@ -63,14 +70,29 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', createOpti
     # get basic information and create output raster:
     ds = gdal.Open(os.path.join(path, files[0]), GA_ReadOnly)
     band = ds.GetRasterBand(1)
+    if noData == None:
+        nodata = band.GetNoDataValue()
+    else:
+        nodata = noData
     driver = gdal.GetDriverByName(outFormat)
     
     if createOptions != None:
-        ds_out = driver.Create(outName, ds.RasterXSize, ds.RasterYSize,
-                               len(files), band.DataType, createOptions)
+        if outPath == None:
+            ds_out = driver.Create(os.path.join(path, outName), ds.RasterXSize, \
+                    ds.RasterYSize, len(files), band.DataType, createOptions)
+        else:            
+            ds_out = driver.Create(os.path.join(outPath, outName), \
+                        ds.RasterXSize, ds.RasterYSize, len(files), \
+                        band.DataType, createOptions)
     else:
-        ds_out = driver.Create(outName, ds.RasterXSize, ds.RasterYSize,
-                               len(files), band.DataType)
+        if outPath == None:
+            ds_out = driver.Create(os.path.join(path, outName), \
+                        ds.RasterXSize, ds.RasterYSize, len(files), \
+                        band.DataType)
+        else:
+            ds_out = driver.Create(os.path.join(outPath, outName), \
+                        ds.RasterXSize, ds.RasterYSize, len(files), \
+                        band.DataType)
                                
     band = None
     proj = ds.GetProjection()
@@ -101,16 +123,19 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', createOpti
         except:
             pass
         
-        if outPath == None:
-            ds = gdal.Open(os.path.join(path, name), GA_ReadOnly)
-        else:
-            ds = gdal.Open(os.path.join(outPath, name), GA_ReadOnly)
+        ds = gdal.Open(os.path.join(path, name), GA_ReadOnly)
         band = ds.GetRasterBand(1)
+        if dataType == None:
+            dtype = band.DataType
+        else:
+            dtype = dataType
+            
         data = band.ReadRaster(0, 0, ds.RasterXSize, ds.RasterYSize,
-                               ds.RasterXSize, ds.RasterYSize, band.DataType)
+                               ds.RasterXSize, ds.RasterYSize, dtype)
         band_out = ds_out.GetRasterBand(band_index)
+        band_out.SetNoDataValue(nodata)
         band_out.WriteRaster(0, 0, ds.RasterXSize, ds.RasterYSize, data,
-                             ds.RasterXSize, ds.RasterYSize, band.DataType)
+                             ds.RasterXSize, ds.RasterYSize, dtype)
         ds = None
         band_index += 1
     
