@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
 
+import os
+import sys
+import string
+from osgeo import gdal
+from osgeo.gdalconst import *
+import numpy as np
+
 def create_mask(image, values, valRange=True, dataBand=None, outName=None, outPath=None, outFormat='GTiff'):
     
     """
@@ -33,13 +40,6 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, outPa
             Defaults to 'GTiFF'.
     """
     
-    import os
-    import sys
-    import string
-    from osgeo import gdal
-    from osgeo.gdalconst import *
-    import numpy as np
-    
     gdal.AllRegister()
     
     driver = gdal.GetDriverByName(outFormat)
@@ -56,13 +56,12 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, outPa
     # 'or'.statement for numpy (if a list of values is given instead of a range):
     val_strings = []
     if valRange == True:
-        mask = np.where(((data >= values[0]) | (data <= values[1])))
+        mask = np.where(((data >= values[0]) & (data <= values[1])), 1, 0)
     else:
         for i in xrange(len(vals)):
             val_strings.append(string.join(['(data == ', str(values[i]), ')'], sep=''))
-    
         exp = 'np.where((' + string.join([v for v in val_strings], sep=' | ') + '), 1, 0)'
-    mask = eval(exp)
+        mask = eval(exp)
     # create output name:
     if outName == None:
         if outPath == None:
@@ -77,8 +76,8 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, outPa
             outname = os.path.join(os.path.dirname(image), outName)
         else:
             outname = os.path.join(outPath, outName)
-    # create output file:
-    ds_out = driver.Create(outname, cols, rows, 1, band.DataType)
+    # create output file (with GDAL data type 1 (Byte)):
+    ds_out = driver.Create(outname, cols, rows, 1, 1)
     ds_out.SetProjection(ds.GetProjection())
     ds_out.SetGeoTransform(ds.GetGeoTransform())
     b_out = ds_out.GetRasterBand(1)
