@@ -1,5 +1,16 @@
 # -*- coding: utf-8 -*-
 
+import os
+import sys
+import string
+from osgeo import gdal
+from osgeo.gdalconst import *
+
+try:
+    import module_progress_bar as pr
+except:
+    pass
+    
 def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, dataType=None, createOptions=None, bandNames=None, searchString=None):
     
     """
@@ -38,18 +49,7 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, 
             must have in common to be used for the layerstack (e.g. file 
             extensions). May be useful, if 'path' contains also other files 
             which shall or can not be used by this function.
-    """    
-
-    import os
-    import sys
-    import string
-    from osgeo import gdal
-    from osgeo.gdalconst import *
-    
-    try:
-        import module_progress_bar as pr
-    except:
-        pass
+    """
 
     # check if outfile exists and delete it:
     if outPath == None:
