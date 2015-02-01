@@ -103,6 +103,8 @@ def apply_mask(image, maskImage, outName, outPath=None, outFormat='Gtiff', \
 
         ds_out.SetProjection(maskds.GetProjection())
         ds_out.SetGeoTransform(maskds.GetGeoTransform())
+    
+    ds_out.SetMetadata(ds.GetMetadata())
 
     # apply mask to all bands:
     for b in xrange(1, bands + 1):
