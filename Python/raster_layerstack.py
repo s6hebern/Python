@@ -11,7 +11,8 @@ try:
 except:
     pass
     
-def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, dataType=None, createOptions=None, bandNames=None, searchString=None):
+def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, \
+        dataType=None, createOptions=None, bandNames=None, searchString=None):
     
     """
     Create a layerstack from all files within a directory.
