@@ -7,7 +7,8 @@ from osgeo import gdal
 from osgeo.gdalconst import *
 import numpy as np
 
-def create_mask(image, values, valRange=True, dataBand=None, outName=None, outPath=None, outFormat='GTiff'):
+def create_mask(image, values, valRange=True, dataBand=None, outName=None, \
+        outPath=None, outFormat='GTiff'):
     
     """
     Create a binary mask (containing only 0 and 1) from an image (which may 
