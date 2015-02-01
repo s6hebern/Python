@@ -13,7 +13,7 @@ def progress(iterator, iterable):
     iterable: the iterable object to which the loop is applied.
     """
 
-    iterator = iterable.index(iterator)
+    iterator = list(iterable).index(iterator)
     iterable = xrange(len(iterable))
     
     percent = range(5, 105, 5)
