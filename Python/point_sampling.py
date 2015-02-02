@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 
 from osgeo import ogr, gdal
-from osgeo.gdalconst import *
+from gdalconst import *
 import os
+import string
 import numpy as np
 import re
 
@@ -31,9 +32,15 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='media
             
     winRad (integer): the radius of the window around the respective point 
             position. For example, a value of 4 will create a window of 8x8 
-            pixels (4 pixels to each direction). If not specified, no window 
-            will be used and the value will be taken from the exact point 
-            position.
+            pixels (4 pixels to each direction). Defaults to 0, which means that 
+            the value will be taken from the exact point position.
+            If a point lies so close to the edges of the raster that the origin 
+            of the sampling window would be outside the raster, it will be moved 
+            right to the raster's edge. It will then also be resized to the 
+            remainder of the originally desired size.
+            If the origin of the sampling window is inside the raster, but the
+            window would cross the edges, it will also be resized to the maximum
+            possible size.
             
     mode (string): the statistical value which shall be taken from the window. 
             Possible values are:
@@ -50,7 +57,8 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='media
             with a maximum length of 10 characters. If not specified, the band 
             names of the raster file will be taken as field names. If they 
             contain characters which are not within (a-z, A-Z, 0-9, _, -) those 
-            will be deleted.
+            will be deleted. If the raster file has no band names, they will be
+            created as 'Band_1', 'Band_2', etc.
     """
 
     raster = raster
@@ -74,6 +82,9 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='media
     # create field names from raster band names:
     bandNames = sorted(rst.GetMetadata().values())
     bandNames.remove('Area')
+    if bandNames == []:
+        bandNames = [string.join(['Band', str(i)], sep='_') for i in xrange(1, \
+                                                                    bands + 1)]
     # delete characters which are not in the following list:
     bandNames = [re.sub(r'[^a-zA-Z0-9_-]', r'', str(i)) for i in bandNames]
     
@@ -123,19 +134,40 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='media
             if winRad == 0:
                 data = band.ReadAsArray(xOff, yOff, 1, 1)
             else:
+                xOff = xOff - winRad
+                yOff = yOff - winRad
+                # check if window origin still within raster:
+                if xOff < 0:
+                    winX = winRad - xOff
+                    xOff = 0
+                    
+                if yOff < 0:
+                    winY = winRad - yOff
+                    yOff = 0
+                # check if window size still fits into raster without crossing 
+                # the edges. If not, set window size to maximum possible value:
+                if xOff + (winRad * 2) > xSize:
+                    winX = xSize - xOff
+                else:
+                    winX = winRad * 2
+                    
+                if yOff + (winRad * 2) > ySize:
+                    winY = ySize - yOff
+                else:
+                    winY = winRad * 2
+                # get data within desired window:
+                window = band.ReadAsArray(xOff, yOff, winX, winY)
+
+                # calculate desired statistic:
                 if mode == 'median':
-                    data = np.median(np.ma.masked_invalid(band.ReadAsArray( \
-                            xOff - winRad, yOff - winRad, winRad * 2, winRad * 2)))
+                    data = np.median(np.ma.masked_invalid(window))
                 elif mode == 'mean':
-                    data = np.nanmean(np.ma.masked_invalid(band.ReadAsArray( \
-                            xOff - winRad, yOff - winRad, winRad * 2, winRad * 2)))
+                    data = np.nanmean(np.ma.masked_invalid(window))
                 elif mode == 'min':
-                    data = np.nanmin(np.ma.masked_invalid(band.ReadAsArray( \
-                            xOff - winRad, yOff - winRad, winRad * 2, winRad * 2)))
+                    data = np.nanmin(np.ma.masked_invalid(window))
                 elif mode == 'max':
-                    data = np.nanmax(np.ma.masked_invalid(band.ReadAsArray( \
-                            xOff - winRad, yOff - winRad, winRad * 2, winRad * 2)))
-                                                    
+                    data = np.nanmax(np.ma.masked_invalid(window))
+            # convert to desired data type:
             if dataType == ogr.OFTInteger and data != None:
                 val = int(data)
             elif dataType == ogr.OFTInteger and data == None:
