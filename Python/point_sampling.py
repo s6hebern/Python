@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from osgeo import ogr, gdal
+from osgeo import ogr, gdal, gdal_array
 from gdalconst import *
 import os
 import string
@@ -12,7 +12,9 @@ try:
 except:
     pass
     
-def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='median', precision=None, names=None):
+def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, \
+        mode='median', noDataValue=None, removeValue=None, precision=None, \
+        names=None):
     
     """
     Point sampling of a point shapefile and an image file. Creates a new 
@@ -48,6 +50,13 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='media
                 - 'mean'
                 - 'min'
                 - 'max'
+    
+    noDataValue (integer): the desired nodata-value, if the input image does not
+            have one or it shall be changed for the shapefile.
+    
+    removeValue (integer): the nodata-value of the input image, which will be deleted
+            from the sampling window before calculating the desired statistic.
+            Defaults to NONE (which means that no value shall be deleted).
             
     precision (integer): the precision of the output attribute field, if 
             floating numbers are desired. If not specified, precision will be 
@@ -81,7 +90,8 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='media
     
     # create field names from raster band names:
     bandNames = sorted(rst.GetMetadata().values())
-    bandNames.remove('Area')
+    if bandNames.__contains__('Area'):
+        bandNames.remove('Area')
     if bandNames == []:
         bandNames = [string.join(['Band', str(i)], sep='_') for i in xrange(1, \
                                                                     bands + 1)]
@@ -106,6 +116,8 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='media
         pr.progress(f, xrange(bands))
         
         b = rst.GetRasterBand(f + 1)
+        dt = b.DataType
+        
         # check for invalid values:
         maxVal = int(round(np.nanmax(np.ma.masked_invalid(b.ReadAsArray(0, 0, \
                                                             xSize, ySize)))))
@@ -130,6 +142,10 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='media
             # get band:
             band = rst.GetRasterBand(f + 1)
             noData = band.GetNoDataValue()
+            if noData == None and noDataValue != None:
+                noData = noDataValue
+            elif noData == None and noDataValue == None:
+                noData = 0
             # get value at the desired position (or window):
             if winRad == 0:
                 data = band.ReadAsArray(xOff, yOff, 1, 1)
@@ -138,11 +154,11 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='media
                 yOff = yOff - winRad
                 # check if window origin still within raster:
                 if xOff < 0:
-                    winX = winRad - xOff
+                    winX = winRad * 2 - abs(xOff)
                     xOff = 0
                     
                 if yOff < 0:
-                    winY = winRad - yOff
+                    winY = winRad * 2 - abs(yOff)
                     yOff = 0
                 # check if window size still fits into raster without crossing 
                 # the edges. If not, set window size to maximum possible value:
@@ -157,17 +173,25 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, mode='media
                     winY = winRad * 2
                 # get data within desired window:
                 window = band.ReadAsArray(xOff, yOff, winX, winY)
-
-                # calculate desired statistic:
-                if mode == 'median':
-                    data = np.median(np.ma.masked_invalid(window))
-                elif mode == 'mean':
-                    data = np.nanmean(np.ma.masked_invalid(window))
-                elif mode == 'min':
-                    data = np.nanmin(np.ma.masked_invalid(window))
-                elif mode == 'max':
-                    data = np.nanmax(np.ma.masked_invalid(window))
+                # delete desired removeValue from window:
+                if removeValue != None:
+                    #dt = gdal_array.GDALTypeCodeToNumericTypeCode(dt)
+                    dt = type(window[0, 0])
+                    window = window[window != dt(removeValue)]
+                if window.size == 0:
+                    data = noData
+                else:
+                    # calculate desired statistic:
+                    if mode == 'median':
+                        data = np.median(np.ma.masked_invalid(window))
+                    elif mode == 'mean':
+                        data = np.nanmean(np.ma.masked_invalid(window))
+                    elif mode == 'min':
+                        data = np.nanmin(np.ma.masked_invalid(window))
+                    elif mode == 'max':
+                        data = np.nanmax(np.ma.masked_invalid(window))
             # convert to desired data type:
+
             if dataType == ogr.OFTInteger and data != None:
                 val = int(data)
             elif dataType == ogr.OFTInteger and data == None:
