@@ -6,7 +6,7 @@ import string
 from osgeo import gdal
 from osgeo.gdalconst import *
 try:
-    import module_progress_bar as pr
+    import module_progress_bar as pb
 except:
     pass
 
@@ -95,6 +95,11 @@ def spectral_subset(image, bands, out, outFormat='GTiff', createOptions=None, \
     band_index = 1
     
     for b in bands:
+        try:
+            pb.progress(b, bands)
+        except:
+            pass
+        
         band = ds.GetRasterBand(b)
         dtype = band.DataType
         data = band.ReadRaster(0, 0, ds.RasterXSize, ds.RasterYSize, \
