@@ -50,6 +50,7 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, \
                 - 'mean'
                 - 'min'
                 - 'max'
+                - 'majority' (most frequent value, only for integer values)
     
     noDataValue (integer): the desired nodata-value, if the input image does not
             have one or it shall be changed for the shapefile.
@@ -118,9 +119,9 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, \
         b = rst.GetRasterBand(f + 1)
         dt = b.DataType
         
-        # check for invalid values:
-        maxVal = int(round(np.nanmax(np.ma.masked_invalid(b.ReadAsArray(0, 0, \
-                                                            xSize, ySize)))))
+        # get maximum value to set field width (valid values only):
+        maxVal = int(b.ComputeRasterMinMax()[1])
+
         b = None
         # check if fields already exist:
         if str(fieldNames[f]) in lyr.GetFeature(0).keys():
@@ -190,6 +191,9 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, \
                         data = np.nanmin(np.ma.masked_invalid(window))
                     elif mode == 'max':
                         data = np.nanmax(np.ma.masked_invalid(window))
+                    elif mode == 'majority':
+                        data = np.bincount(window.flatten()).argmax()
+
             # convert to desired data type:
 
             if dataType == ogr.OFTInteger and data != None:
