@@ -58,25 +58,7 @@ def spectral_subset(image, bands, out, outFormat='GTiff', createOptions=None, \
     proj = ds.GetProjection()
     transform = ds.GetGeoTransform()
     ds_meta = ds.GetMetadata()
-    # create new band names (either from original image or from user input):
-    meta = {}
 
-    if bandNames == None:
-        count = 1
-        for b in bands:
-            name = string.join(['Band', str(b)], sep='_')
-            for key in ds_meta.keys():
-                if name == key:
-                    new_name = string.join(['Band', str(count)], sep='_')
-                    meta[new_name] = ds_meta[key]
-                    count += 1
-    else:
-        count = 1
-        for n in bandNames:
-            new_name = string.join(['Band', str(count)], sep='_')
-            meta[new_name] = str(n)
-            count += 1
-    
     # create output image with the desired number of bands:
     if createOptions != None:
         ds_out = driver.Create(out, ds.RasterXSize, ds.RasterYSize, len(bands), \
@@ -84,27 +66,40 @@ def spectral_subset(image, bands, out, outFormat='GTiff', createOptions=None, \
     else:
         ds_out = driver.Create(out, ds.RasterXSize, ds.RasterYSize, len(bands), \
                                 band.DataType)
-        
+
     ds_out.SetProjection(proj)
     ds_out.SetGeoTransform(transform)
-    ds_out.SetMetadata(meta)
     
     band = None
     
     # get desired bands from input image and write them to the new file:
     band_index = 1
+    # new dictionary for metadata:
+    meta = {}
     
-    for b in bands:
+    for b in xrange(len(bands)):
         try:
-            pb.progress(b, bands)
+            pb.progress(bands[b], bands)
         except:
             pass
         
-        band = ds.GetRasterBand(b)
+        band = ds.GetRasterBand(bands[b])
+
         dtype = band.DataType
         data = band.ReadRaster(0, 0, ds.RasterXSize, ds.RasterYSize, \
                                ds.RasterXSize, ds.RasterYSize, dtype)
         band_out = ds_out.GetRasterBand(band_index)
+
+        # create new band names (either from original image or from user input):
+        if bandNames == None:
+        	name = string.join(['Band', str(bands[b])], sep='_')
+        	meta[name] = band.GetDescription()
+        	band_out.SetDescription(band.GetDescription())
+        else:
+        	name = string.join(['Band', str(bands[b])], sep='_')
+        	meta[name] = bandNames[b]
+        	band_out.SetDescription(bandNames[b])
+
         if nodata != None:
             band_out.SetNoDataValue(nodata)
         band_out.WriteRaster(0, 0, ds.RasterXSize, ds.RasterYSize, data,
@@ -112,5 +107,7 @@ def spectral_subset(image, bands, out, outFormat='GTiff', createOptions=None, \
         band = None
         band_index += 1
     
+    ds_out.SetMetadata(meta)
+
     ds_out = None
     ds = None
