@@ -188,7 +188,43 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, 
 ### Band insertion ###
 ######################
 
-def insert_band(raster, layer, outName, bandIndex=None, bandNames=None, outFormat=None, createOptions=None):
+def insert_band(raster, layer, outName, bandIndex=None, bandNames=None, \
+                outFormat=None, createOptions=None):
+    
+    
+    """
+    Insert raster layers into a multiband image at desired positions.
+    
+    Use:
+    
+    raster (string): the name of the output file (full path and file extension).
+    
+    layer (string / list): EITHER the name of the input raster containing the 
+            layer to be inserted (full path and file extension)
+            OR
+            a list containing all (single-band) rasters to be inserted.
+    
+    outName (string): the name of the output file (full path and file extension).
+    
+    bandIndex (integer / list): EITHER a single value indicating the position
+            for the layer
+            OR
+            a list of integers containing all positions.
+            Per default, the layer(s) is/are inserted at the end.
+    
+    bandNames (list): a list of band names for the inserted layers. Defaults to 
+            the names of the input files.
+    
+    outFormat (string): the desired format of the output file as provided by the 
+            GDAL raster formats (see: http://www.gdal.org/formats_list.html). 
+            Defaults to the format of the input raster.
+    
+    createOptions (list): a list of strings, containing advanced raster creation 
+            options such as band interleave.
+            
+            Example:
+                createOptions=['interleave=bil']
+    """
     
     gdal.AllRegister()
     
@@ -206,10 +242,13 @@ def insert_band(raster, layer, outName, bandIndex=None, bandNames=None, outForma
     if isinstance(layer, basestring) == True:
         layer = list(layer)
     
-    if isinstance(bandIndex, list) == False:
-        newBands = list(bandIndex)
+    if bandIndex != None:
+        if isinstance(bandIndex, list) == False:
+            newBands = list(bandIndex)
+        else:
+            newBands = bandIndex
     else:
-        newBands = bandIndex
+        newBands = [i for i in xrange(bands + 1, bands + (len(layer) + 1))]
     
     if bandNames != None:
         if isinstance(bandNames, list) == False:
@@ -234,22 +273,118 @@ def insert_band(raster, layer, outName, bandIndex=None, bandNames=None, outForma
     ds_out.SetGeoTransform(transform)
     
     band = None
-    lyr_index = 1
-    band_index = 1
-       
-    for b in xrange(1, bands + 1):
-        # progress bar:
-        try:
-            pr.progress(b, xrange(1, bands + 1))
-        except:
-            pass
+    
+    if bandIndex != None:
+        lyr_index = 1
+        band_index = 1
+        # insert single layers at desired positions
+        for b in xrange(1, bands + 1):
+            # progress bar:
+            try:
+                pr.progress(b, xrange(1, bands + 1))
+            except:
+                pass
+    
+            if b in newBands:
+                insert = gdal.Open(layer[lyr_index - 1], GA_ReadOnly)
+                band = insert.GetRasterBand(1)
+                dtype = band.DataType
+                nodata = band.GetNoDataValue()
+                
+                data = band.ReadRaster(0, 0, x, y, x, y, dtype)
+                band_out = ds_out.GetRasterBand(band_index)
+                
+                # create new band names (either from original image or from user input):
+                if bandNames == None:
+                    name = string.join(['Band', str(band_index)], sep='_')
+                    desc = band.GetDescription()
+                    if len(desc) == 0:
+                        desc = layer[lyr_index - 1]
+                    meta[name] = desc
+                    band_out.SetDescription(band.GetDescription())
+                else:
+                    name = string.join(['Band', str(band_index)], sep='_')
+                    meta[name] = bandNames[lyr_index - 1]
+                    band_out.SetDescription(bandNames[lyr_index - 1])
+             
+                band_out.SetNoDataValue(double(nodata))
+                band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
+                
+                lyr_index += 1
+                band_index += 1
+                
+                insert = None
+                
+                # then next band of original image:
+                band = ds.GetRasterBand(b)
+                dtype = band.DataType
+                nodata = band.GetNoDataValue()
+               
+                data = band.ReadRaster(0, 0, x, y, x, y, dtype)
+                band_out = ds_out.GetRasterBand(b)
+                
+                name = string.join(['Band', str(band_index)], sep='_')
+                meta[name] = band.GetDescription()
+                band_out.SetDescription(band.GetDescription())
+                
+                band_out.SetNoDataValue(double(nodata))
+                band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
+                
+                band_index += 1
+                
+                band_out = None
+                band = None
+                
+            else:
+                band = ds.GetRasterBand(b)
+                dtype = band.DataType
+                nodata = band.GetNoDataValue()
+               
+                data = band.ReadRaster(0, 0, x, y, x, y, dtype)
+                band_out = ds_out.GetRasterBand(b)
+                
+                name = string.join(['Band', str(band_index)], sep='_')
+                meta[name] = band.GetDescription()
+                band_out.SetDescription(band.GetDescription())
+    
+                band_out.SetNoDataValue(double(nodata))
+                band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
+                
+                band_index += 1
+            
+                band_out = None
+                band = None
+                
+    else:
+        lyr_index = 1
+        band_index = 1
+    # insert single layers at the end
+        for b in xrange(1, bands + 1):
+            band = ds.GetRasterBand(b)
+            dtype = band.DataType
+            nodata = band.GetNoDataValue()
+           
+            data = band.ReadRaster(0, 0, x, y, x, y, dtype)
+            band_out = ds_out.GetRasterBand(b)
+            
+            name = string.join(['Band', str(band_index)], sep='_')
+            meta[name] = band.GetDescription()
+            band_out.SetDescription(band.GetDescription())
+    
+            band_out.SetNoDataValue(double(nodata))
+            band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
+            
+            band_index += 1
         
-        if b in newBands:
-            insert = gdal.Open(layer[lyr_index - 1], GA_ReadOnly)
+            band_out = None
+            band = None
+            
+        for i in xrange(0, len(newBands)):
+            insert = gdal.Open(layer[i], GA_ReadOnly)
             band = insert.GetRasterBand(1)
             dtype = band.DataType
             nodata = band.GetNoDataValue()
-            
+                
             data = band.ReadRaster(0, 0, x, y, x, y, dtype)
             band_out = ds_out.GetRasterBand(band_index)
             
@@ -259,57 +394,18 @@ def insert_band(raster, layer, outName, bandIndex=None, bandNames=None, outForma
                 desc = band.GetDescription()
                 if len(desc) == 0:
                     desc = layer[lyr_index - 1]
-            	meta[name] = desc
-            	band_out.SetDescription(band.GetDescription())
+                meta[name] = desc
+                band_out.SetDescription(band.GetDescription())
             else:
-            	name = string.join(['Band', str(band_index)], sep='_')
-            	meta[name] = bandNames[lyr_index - 1]
-            	band_out.SetDescription(bandNames[lyr_index - 1])
-         
-            band_out.SetNoDataValue(double(nodata))
-            band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
-            
-            lyr_index += 1
-            band_index += 1
-            
-            insert = None
-            
-            # then next band of original image:
-            band = ds.GetRasterBand(b)
-            dtype = band.DataType
-            nodata = band.GetNoDataValue()
-           
-            data = band.ReadRaster(0, 0, x, y, x, y, dtype)
-            band_out = ds_out.GetRasterBand(b)
-            
-            name = string.join(['Band', str(band_index)], sep='_')
-            meta[name] = band.GetDescription()
-            band_out.SetDescription(band.GetDescription())
-            
-            band_out.SetNoDataValue(double(nodata))
-            band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
-            
-            band_index += 1
-            
-        else:
-            band = ds.GetRasterBand(b)
-            dtype = band.DataType
-            nodata = band.GetNoDataValue()
-           
-            data = band.ReadRaster(0, 0, x, y, x, y, dtype)
-            band_out = ds_out.GetRasterBand(b)
-            
-            name = string.join(['Band', str(band_index)], sep='_')
-            meta[name] = band.GetDescription()
-            band_out.SetDescription(band.GetDescription())
-
-            band_out.SetNoDataValue(double(nodata))
-            band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
-            
-            band_index += 1
-        
-        band_out = None
-        band = None
+                name = string.join(['Band', str(band_index)], sep='_')
+                meta[name] = bandNames[lyr_index - 1]
+                band_out.SetDescription(bandNames[lyr_index - 1])
+             
+                band_out.SetNoDataValue(double(nodata))
+                band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
+                
+                lyr_index += 1
+                band_index += 1
         
     ds_out.SetMetadata(meta)
     
