@@ -10,9 +10,15 @@ try:
     import module_progress_bar as pr
 except:
     pass
-    
+   
+   
+##################
+### Layerstack ###
+##################
+
 def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, \
-        dataType=None, createOptions=None, bandNames=None, searchString=None):
+        dataType=None, createOptions=None, bandNames=None, searchString=None, \
+        bandIdent=None):
     
     """
     Create a layerstack from all files within a directory.
@@ -50,6 +56,10 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, 
             must have in common to be used for the layerstack (e.g. file 
             extensions). May be useful, if 'path' contains also other files 
             which shall or can not be used by this function.
+    
+    bandIdent (list): a list of strings specifying the band identification 
+            within the file name of each raster to be stacked. Can be useful if 
+            only specific bands shall be used (e.g. for raw Landsat data).
     """
 
     # check if outfile exists and delete it:
@@ -66,40 +76,57 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, 
     # list all files which shall be stacked:
     files = os.listdir(path)
     if searchString != None:
-        files = [item for item in files if item.__contains__(searchString)]
+        files = [item for item in files if searchString in item]
     files.sort()
+    print files
+    layers = []
+    
+    if bandIdent != None:
+        for f in files:
+            for i in bandIdent:
+                if str(i) in f:
+                    layers.append(f)
+                else:
+                    pass
+    
+        files = layers
+
     # get basic information and create output raster:
     ds = gdal.Open(os.path.join(path, files[0]), GA_ReadOnly)
     band = ds.GetRasterBand(1)
+    
+    proj = ds.GetProjection()
+    transform = ds.GetGeoTransform()
+    x = ds.RasterXSize
+    y = ds.RasterYSize
+    meta = ds.GetMetadata_Dict()
+    dtype = band.DataType
+    
     if noData == None:
         nodata = band.GetNoDataValue()
     else:
         nodata = noData
     driver = gdal.GetDriverByName(outFormat)
     
-    if createOptions != None:
+    if createOptions == None:
         if outPath == None:
-            ds_out = driver.Create(os.path.join(path, outName), ds.RasterXSize, \
-                    ds.RasterYSize, len(files), band.DataType, createOptions)
+            ds_out = driver.Create(os.path.join(path, outName), x, y, \
+                        len(files), dtype)
         else:            
-            ds_out = driver.Create(os.path.join(outPath, outName), \
-                        ds.RasterXSize, ds.RasterYSize, len(files), \
-                        band.DataType, createOptions)
+            ds_out = driver.Create(os.path.join(outPath, outName), x, y, \
+                        len(files), dtype)
     else:
         if outPath == None:
             ds_out = driver.Create(os.path.join(path, outName), \
-                        ds.RasterXSize, ds.RasterYSize, len(files), \
-                        band.DataType)
+                        x, y, len(files), dtypee, createOptions)
         else:
             ds_out = driver.Create(os.path.join(outPath, outName), \
-                        ds.RasterXSize, ds.RasterYSize, len(files), \
-                        band.DataType)
+                        x, y, len(files), dtype, createOptions)
                                
-    band = None
-    proj = ds.GetProjection()
     ds_out.SetProjection(proj)
-    transform = ds.GetGeoTransform()
     ds_out.SetGeoTransform(transform)
+    band = None
+    
     # set band names:
     bands = []
     bandNum = 1
@@ -117,6 +144,7 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, 
     ds = None
     # loop through all files and stack them:
     band_index = 1
+    
     for name in files:
         # progress bar:
         try:
@@ -131,13 +159,159 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, 
         else:
             dtype = dataType
             
-        data = band.ReadRaster(0, 0, ds.RasterXSize, ds.RasterYSize,
-                               ds.RasterXSize, ds.RasterYSize, dtype)
+        data = band.ReadRaster(0, 0, x, y, x, y, dtype)
         band_out = ds_out.GetRasterBand(band_index)
+        # create new band names (either from original image or from user input):
+        if bandNames == None:
+            bname = string.join(['Band', str(band_index)], sep='_')
+            desc = band.GetDescription()
+            if len(desc) == 0:
+                desc = bname
+        	meta[bname] = desc
+        	band_out.SetDescription(bname)
+        else:
+            bname = string.join(['Band', str(band_index)], sep='_')
+            meta[bname] = bandNames[band_index]
+            band_out.SetDescription(bandNames[band_index])
+            
         band_out.SetNoDataValue(nodata)
-        band_out.WriteRaster(0, 0, ds.RasterXSize, ds.RasterYSize, data,
-                             ds.RasterXSize, ds.RasterYSize, dtype)
-        ds = None
+        band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
+        
         band_index += 1
+        
+        band = None
+        ds = None
     
     ds_out = None
+
+######################
+### Band insertion ###
+######################
+
+def insert_band(raster, layer, outName, bandIndex=None, bandNames=None, outFormat=None, createOptions=None):
+    
+    gdal.AllRegister()
+    
+     # get basic information and create output raster:
+    ds = gdal.Open(raster, GA_ReadOnly)    
+    bands = ds.RasterCount
+
+    band = ds.GetRasterBand(1)
+    x = ds.RasterXSize
+    y = ds.RasterYSize
+    proj = ds.GetProjection()
+    transform = ds.GetGeoTransform()
+    meta = ds.GetMetadata_Dict()
+    
+    if isinstance(layer, basestring) == True:
+        layer = list(layer)
+    
+    if isinstance(bandIndex, list) == False:
+        newBands = list(bandIndex)
+    else:
+        newBands = bandIndex
+    
+    if bandNames != None:
+        if isinstance(bandNames, list) == False:
+            bandNames = list(bandNames)
+        else:
+            bandNames = bandNames
+
+    if outFormat == None:
+        outFormat = ds.GetDriver().GetDescription()
+    else:
+        outFormat = outFormat
+    
+    driver = gdal.GetDriverByName(outFormat)
+    
+    if createOptions == None:
+        ds_out = driver.Create(outName, x, y, bands + len(newBands), band.DataType)
+    else:
+        ds_out = driver.Create(outName, x, y, bands + len(newBands), band.DataType, \
+                                createOptions)
+                               
+    ds_out.SetProjection(proj)
+    ds_out.SetGeoTransform(transform)
+    
+    band = None
+    lyr_index = 1
+    band_index = 1
+       
+    for b in xrange(1, bands + 1):
+        # progress bar:
+        try:
+            pr.progress(b, xrange(1, bands + 1))
+        except:
+            pass
+        
+        if b in newBands:
+            insert = gdal.Open(layer[lyr_index - 1], GA_ReadOnly)
+            band = insert.GetRasterBand(1)
+            dtype = band.DataType
+            nodata = band.GetNoDataValue()
+            
+            data = band.ReadRaster(0, 0, x, y, x, y, dtype)
+            band_out = ds_out.GetRasterBand(band_index)
+            
+            # create new band names (either from original image or from user input):
+            if bandNames == None:
+                name = string.join(['Band', str(band_index)], sep='_')
+                desc = band.GetDescription()
+                if len(desc) == 0:
+                    desc = layer[lyr_index - 1]
+            	meta[name] = desc
+            	band_out.SetDescription(band.GetDescription())
+            else:
+            	name = string.join(['Band', str(band_index)], sep='_')
+            	meta[name] = bandNames[lyr_index - 1]
+            	band_out.SetDescription(bandNames[lyr_index - 1])
+         
+            band_out.SetNoDataValue(double(nodata))
+            band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
+            
+            lyr_index += 1
+            band_index += 1
+            
+            insert = None
+            
+            # then next band of original image:
+            band = ds.GetRasterBand(b)
+            dtype = band.DataType
+            nodata = band.GetNoDataValue()
+           
+            data = band.ReadRaster(0, 0, x, y, x, y, dtype)
+            band_out = ds_out.GetRasterBand(b)
+            
+            name = string.join(['Band', str(band_index)], sep='_')
+            meta[name] = band.GetDescription()
+            band_out.SetDescription(band.GetDescription())
+            
+            band_out.SetNoDataValue(double(nodata))
+            band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
+            
+            band_index += 1
+            
+        else:
+            band = ds.GetRasterBand(b)
+            dtype = band.DataType
+            nodata = band.GetNoDataValue()
+           
+            data = band.ReadRaster(0, 0, x, y, x, y, dtype)
+            band_out = ds_out.GetRasterBand(b)
+            
+            name = string.join(['Band', str(band_index)], sep='_')
+            meta[name] = band.GetDescription()
+            band_out.SetDescription(band.GetDescription())
+
+            band_out.SetNoDataValue(double(nodata))
+            band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
+            
+            band_index += 1
+        
+        band_out = None
+        band = None
+        
+    ds_out.SetMetadata(meta)
+    
+    ds_out = None
+    ds = None
