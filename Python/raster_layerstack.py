@@ -188,8 +188,10 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, 
 ### Band insertion ###
 ######################
 
-def insert_band(raster, layer, outName, bandIndex=None, bandNames=None, \
-                outFormat=None, createOptions=None):
+# Still missing: BAND SUBSTITUION
+
+def insert_band(raster, layer, outName, bandIndex=None, substitute=False, \
+                bandNames=None, outFormat=None, createOptions=None):
     
     
     """
@@ -211,6 +213,12 @@ def insert_band(raster, layer, outName, bandIndex=None, bandNames=None, \
             OR
             a list of integers containing all positions.
             Per default, the layer(s) is/are inserted at the end.
+    
+    substitute (boolean): if set "True", the layers to be inserted will 
+            substitute the existing one at their resprective positions. Defaults
+            to "False", which means that the new layers will be inserted at the 
+            desired position and all other bands will be appended afterwards.
+            Substitution will not work if "bandIndex" ist not set!
     
     bandNames (list): a list of band names for the inserted layers. Defaults to 
             the names of the input files.
@@ -311,7 +319,9 @@ def insert_band(raster, layer, outName, bandIndex=None, bandNames=None, \
                 band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
                 
                 lyr_index += 1
-                band_index += 1
+                
+                if substitute == False:
+                    band_index += 1
                 
                 insert = None
                 
@@ -356,6 +366,9 @@ def insert_band(raster, layer, outName, bandIndex=None, bandNames=None, \
                 band = None
                 
     else:
+        if substitute == True:
+            raise ValueError("Option 'substitute' will only work with 'bandIndex' set!")
+            
         lyr_index = 1
         band_index = 1
     # insert single layers at the end
