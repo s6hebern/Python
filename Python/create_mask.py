@@ -8,7 +8,7 @@ from osgeo.gdalconst import *
 import numpy as np
 
 def create_mask(image, values, valRange=True, dataBand=None, outName=None, \
-        outPath=None, outFormat='GTiff'):
+        outPath=None, outFormat='GTiff', nodata=None):
     
     """
     Create a binary mask (containing only 0 and 1) from an image (which may 
@@ -39,11 +39,13 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, \
     outFormat (string): the desired format of the output file as provided by the 
             GDAL raster formats (see: http://www.gdal.org/formats_list.html). 
             Defaults to 'GTiFF'.
+	
+	nodata (integer): the desired NoData-value to be set.
     """
     
     gdal.AllRegister()
-    
     driver = gdal.GetDriverByName(outFormat)
+    
     ds = gdal.Open(image, GA_ReadOnly)
     cols = ds.RasterXSize
     rows = ds.RasterYSize
@@ -51,6 +53,7 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, \
         band =  ds.GetRasterBand(1)
     else:
         band = ds.GetRasterBand(dataBand)
+
     data = band.ReadAsArray(0, 0, cols, rows)
     # search for the desired values to be set to 1, set all others 0, making use
     # of the 'eval'-function to concatenate all desired values to a single 
@@ -59,10 +62,13 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, \
     if valRange == True:
         mask = np.where(((data >= values[0]) & (data <= values[1])), 1, 0)
     else:
-        for i in xrange(len(vals)):
+        for i in xrange(len(values)):
             val_strings.append(string.join(['(data == ', str(values[i]), ')'], sep=''))
         exp = 'np.where((' + string.join([v for v in val_strings], sep=' | ') + '), 1, 0)'
         mask = eval(exp)
+    # clean RAM:
+    data = None
+    band = None
     # create output name:
     if outName == None:
         if outPath == None:
@@ -83,6 +89,9 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, \
     ds_out.SetGeoTransform(ds.GetGeoTransform())
     b_out = ds_out.GetRasterBand(1)
     b_out.WriteArray(mask)
+    
+    if nodata != None:
+        b_out.SetNoDataValue(nodata)
     
     b_out = None
     ds_out = None
