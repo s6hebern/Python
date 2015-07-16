@@ -18,7 +18,7 @@ except:
 
 def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, \
         dataType=None, createOptions=None, bandNames=None, searchString=None, \
-        bandIdent=None):
+        bandIdent=None, filePrint=True):
     
     """
     Create a layerstack from all files within a directory.
@@ -60,6 +60,9 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, 
     bandIdent (list): a list of strings specifying the band identification 
             within the file name of each raster to be stacked. Can be useful if 
             only specific bands shall be used (e.g. for raw Landsat data).
+    
+    filePrint (boolean): 'if True' (default), a list of all files to be stacked
+            is printed. Set to 'False' to suppress printing.
     """
 
     # check if outfile exists and delete it:
@@ -171,8 +174,8 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, 
         	band_out.SetDescription(bname)
         else:
             bname = string.join(['Band', str(band_index)], sep='_')
-            meta[bname] = bandNames[band_index]
-            band_out.SetDescription(bandNames[band_index])
+            meta[bname] = bandNames[band_index - 1]
+            band_out.SetDescription(bandNames[band_index - 1])
             
         band_out.SetNoDataValue(nodata)
         band_out.WriteRaster(0, 0, x, y, data, x, y, dtype)
