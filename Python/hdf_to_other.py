@@ -36,6 +36,9 @@ def hdf_to_other(hdf, hdfLayer, outPath=None, outName=None, outFormat='GTiff', o
     Converting hdf format (used by e.g. USGS to distribute MODIS images) to 
     other image format.
     
+    For a complete Python-based MODIS toolbox, use the 'pyMODIS'-library:
+            https://pypi.python.org/pypi/pyModis
+    
     Use:
     
     ----------------------------------------------------------------------------
