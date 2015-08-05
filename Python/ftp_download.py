@@ -25,7 +25,7 @@ def ftp_download(url, user='', pw='', localPath=os.getcwd(), pattern=None):
     localPath (string): the local directory, to which the files shall be 
             downloaded. Defaults to the current working directory.
     
-    pattern (list): a lit of string containing the pattern of characters to look 
+    pattern (list): a list of strings containing the pattern of characters to look 
             for in the file names as a list. May be useful, if there are many 
             files from which only a selection shall be taken.
             Examples:    
