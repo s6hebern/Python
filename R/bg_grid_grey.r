@@ -1,13 +1,14 @@
 # Function to calculate a grid which will be drawn at the major and minor tickmarks of a plot.
 # "Major" grid will be white, "minor" grid will be grey.
 # Also changes the background colour of the plot to lightgrey.
-# Draws grey axis by default. If xy_lines ist set FALSE, axis will not be drawn.
+# Draws grey axis by default, if xy_lines is not set FALSE.
+# Draws a 1-1-line by default, if onelines is not set FALSE.
 #
 # Hints when setting up initial plot:
 # - prevent any drawing of your data, do this after calling this function (e.g. with pch=NA)
 # - suppress drawing of the box around the plot region and all axis (bty="n", axes=F)
 
-bg_grid_grey <- function(xy_axis=T) {
+bg_grid_grey <- function(xy_axes=T, oneline=T) {
   # set background colour of the plotting region:
     rect(par("usr")[1], par("usr")[3], par("usr")[2], par("usr")[4], col = "lightgrey", border=NA)
   # draw vertical lines at minor x-tickmarks:
@@ -27,9 +28,15 @@ bg_grid_grey <- function(xy_axis=T) {
     grid(lty=1, col="white")
     }
   # draw x- and y-axis, if not set FALSE:
-  if (xy_axis == T) {
+  if (xy_axes == T) {
       axis(1, lwd=0, lwd.ticks=1, col="lightgrey")
       axis(2, lwd=0, lwd.ticks=1, col="lightgrey")
+  } else{# do nothing
+    }
+  # draw 1-1-line, if not set FALSE:
+  if (oneline == T) {
+      lines(x=c(par("usr")[1], par("usr")[2]), y=c(par("usr")[3], par("usr")[4]), col="darkgrey")
+  } else{# do nothing
   }
 }
 
