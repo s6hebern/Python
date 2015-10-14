@@ -25,13 +25,19 @@ comp_doy <- function(x, y, addx=NULL, addy=NULL,
     } else {
         x <- replace(x, which(x == exclude), NA)
         y <- replace(y, which(y == exclude), NA)
+        
+        if (is.null(addx) == T & is.null(addy) == T) {# do nothing
+        } else {
+            addx <- replace(addx, which(addx == exclude), NA)
+            addy <- replace(addy, which(addy == exclude), NA)
+        }
     }
     # set up initial plot:
     plot(x, y, bty="n", axes=F, pch=NA, xlim=c(0, 365), ylim=c(0, 365), ...)
     # draw grey box with grid:
     bg_grid_grey()
-    # draw 1:1 line:
-    lines(x=c(0, 365), y=c(0, 365), col="darkgrey")
+#     # draw 1:1 line:
+#     lines(x=c(0, 365), y=c(0, 365), col="darkgrey")
     # draw points if no land use class is desired:
     if (is.null(LU) == T) {
         points(x, y, pch=20, col=xycol)
