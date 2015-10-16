@@ -49,8 +49,13 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, \
     of (string): the desired format of the output file as provided by the 
             GDAL raster formats (see: http://www.gdal.org/formats_list.html). 
             Defaults to 'GTiFF'.
-	
-	nodata (integer): the desired NoData-value to be set.
+    co (list): a list of strings, containing advanced raster creation 
+            options such as band interleave.
+            
+            Example:
+                createOptions=['interleave=bil']
+    
+    nodata (integer): the desired NoData-value to be set.
     """
     
     gdal.AllRegister()
@@ -138,6 +143,12 @@ def apply_mask(image, maskImage, outName, outPath=None, of='Gtiff', co=None, \
     of (string): the desired format of the output file as provided by the 
             GDAL raster formats (see: http://www.gdal.org/formats_list.html). 
             Defaults to 'GTiFF'.
+    
+    co (list): a list of strings, containing advanced raster creation 
+            options such as band interleave.
+            
+            Example:
+                createOptions=['interleave=bil']
     
     outExtent (string): the desired extent and resolution of the output image,
             if input and mask image have different dimensions. 
