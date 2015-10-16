@@ -227,7 +227,10 @@ def apply_mask(image, maskImage, outName, outPath=None, outFormat='Gtiff', \
 
         b_out = None
         
-        pr.progress(b, xrange(1, bands + 1))
+        try:
+            pr.progress(b, xrange(1, bands + 1))
+        except:
+            pass
     
     ds_out = None
     ds = None
