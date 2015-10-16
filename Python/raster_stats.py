@@ -14,8 +14,7 @@ def calc_stat_raster(infile, outfile, mode, of="GTiff", co=None):
     
     infile (string): the (multiband) input image (full path and file extension).
     
-    outfile (string): the name of the output image (full path and file 
-            extension).
+    outfile (string): the output image (full path and file extension).
     
     mode (string / list): the desired statistical value(s). If a string is
             given, the output image will contain one band with the specified 
