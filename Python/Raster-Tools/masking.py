@@ -18,7 +18,7 @@ except:
 ###################
 
 def create_mask(image, values, valRange=True, dataBand=None, outName=None, \
-        outPath=None, outFormat='GTiff', nodata=None):
+        outPath=None, of='GTiff', co=None, nodata=None):
     
     """
     Create a binary mask (containing only 0 and 1) from an image (which may 
@@ -46,7 +46,7 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, \
     outpath (string): the directory to which the output file will be written. 
             Defaults to the parent directory of the input image.
             
-    outFormat (string): the desired format of the output file as provided by the 
+    of (string): the desired format of the output file as provided by the 
             GDAL raster formats (see: http://www.gdal.org/formats_list.html). 
             Defaults to 'GTiFF'.
 	
@@ -54,7 +54,7 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, \
     """
     
     gdal.AllRegister()
-    driver = gdal.GetDriverByName(outFormat)
+    driver = gdal.GetDriverByName(of)
     
     ds = gdal.Open(image, GA_ReadOnly)
     cols = ds.RasterXSize
@@ -94,7 +94,11 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, \
         else:
             outname = os.path.join(outPath, outName)
     # create output file (with GDAL data type 1 (Byte)):
-    ds_out = driver.Create(outname, cols, rows, 1, 1)
+    if co == None:
+        ds_out = driver.Create(outname, cols, rows, 1, 1)
+    else:
+        ds_out = driver.Create(outname, cols, rows, 1, 1, co)
+        
     ds_out.SetProjection(ds.GetProjection())
     ds_out.SetGeoTransform(ds.GetGeoTransform())
     b_out = ds_out.GetRasterBand(1)
@@ -111,7 +115,7 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, \
 ### APPLY MASK ###
 ##################
 
-def apply_mask(image, maskImage, outName, outPath=None, outFormat='Gtiff', \
+def apply_mask(image, maskImage, outName, outPath=None, of='Gtiff', co=None, \
         outExtent='image', interpolation='nearest'):
 
     """
@@ -131,7 +135,7 @@ def apply_mask(image, maskImage, outName, outPath=None, outFormat='Gtiff', \
     outpath (string): the directory to which the output file will be written. 
             Defaults to the parent directory of the input image.
     
-    outFormat (string): the desired format of the output file as provided by the 
+    of (string): the desired format of the output file as provided by the 
             GDAL raster formats (see: http://www.gdal.org/formats_list.html). 
             Defaults to 'GTiFF'.
     
@@ -165,7 +169,7 @@ def apply_mask(image, maskImage, outName, outPath=None, outFormat='Gtiff', \
             
     gdal.AllRegister()
     
-    driver = gdal.GetDriverByName(outFormat)
+    driver = gdal.GetDriverByName(of)
     
     ds = gdal.Open(image, GA_ReadOnly)
     cols = ds.RasterXSize
@@ -176,16 +180,16 @@ def apply_mask(image, maskImage, outName, outPath=None, outFormat='Gtiff', \
     maskBand = maskds.GetRasterBand(1)
     mask = maskBand.ReadAsArray(0, 0, maskds.RasterXSize, maskds.RasterYSize)
     
-    # create (empty) output image:
+    # create (empty) output image:    
     if outExtent == 'image':
         if outPath == None:
             ds_out = driver.Create(os.path.join(path, outName), \
                     ds.RasterXSize, ds.RasterYSize, bands, \
-                    ds.GetRasterBand(1).DataType)
+                    ds.GetRasterBand(1).DataType, co)
         else:
             ds_out = driver.Create(os.path.join(outPath, outName), \
                         ds.RasterXSize, ds.RasterYSize, bands, \
-                        ds.GetRasterBand(1).DataType)
+                        ds.GetRasterBand(1).DataType, co)
                         
         ds_out.SetProjection(ds.GetProjection())
         ds_out.SetGeoTransform(ds.GetGeoTransform())
@@ -194,11 +198,11 @@ def apply_mask(image, maskImage, outName, outPath=None, outFormat='Gtiff', \
         if outPath == None:
             ds_out = driver.Create(os.path.join(path, outName), \
                     maskds.RasterXSize, maskds.RasterYSize, bands, \
-                    band.DataType)
+                    band.DataType, co)
         else:
             ds_out = driver.Create(os.path.join(outPath, outName), \
                         maskds.RasterXSize, maskds.RasterYSize, bands, \
-                        band.DataType)
+                        band.DataType, co)
 
         ds_out.SetProjection(maskds.GetProjection())
         ds_out.SetGeoTransform(maskds.GetGeoTransform())
