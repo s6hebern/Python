@@ -13,16 +13,16 @@ def raster_calc(a, b, outfile, mode, band_a=None, band_b=None, of='GTiff', co=No
     Use:
     
     a (string): first input image (full path and file extension). May contain 
-            multiply bands.
+            multiple bands.
     
     b (string): second input image (full path and file extension). May contain 
-            multiply bands.
+            multiple bands.
     
     outfile (string): the output image (full path and file extension).
     
     mode (string): the arithmetic operation. Must be one of:
             - 'add'
-            - 'subtratc'
+            - 'subtract'
             - 'multiply'
             - 'divide'
     
