@@ -95,6 +95,7 @@ def histogram(infile, band=1, outfile=None, delim=','):
     Compute the exact histogram of an 8bit image, which can be written into a
     csv file containing all values and counts within the min-max-range.
     
+    
     Use:
     
     infile (string): the input image (full path and file extension). May 
@@ -137,6 +138,7 @@ def area_per_class(infile, outfile, band=1, delim=','):
     """
     Compute the per-class-area from a classification image and create a csv 
             table from it.
+    
     
     Use:
     
