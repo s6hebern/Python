@@ -37,7 +37,7 @@ def calc_stat_raster(infile, outfile, mode, of="GTiff", co=None):
             options such as band interleave.
             
             Example:
-                createOptions=['interleave=bil']
+                co=['interleave=bil']
     """
 
     gdal.AllRegister()
