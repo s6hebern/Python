@@ -1,4 +1,10 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+"""
+date: Tue Jan 19 11:25:19 2016
+user: hendrik
+"""
 
 import os
 import sys
@@ -7,7 +13,7 @@ from osgeo import gdal
 from osgeo.gdalconst import *
 
 try:
-    import module_progress_bar as pr
+    import progress_bar as pr
 except:
     pass
    
@@ -16,165 +22,95 @@ except:
 ### Layerstack ###
 ##################
 
-def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, \
-        dataType=None, createOptions=None, bandNames=None, searchString=None, \
-        bandIdent=None, filePrint=True):
+def stack_images(images, outfile, bands=None, of='GTiff', co=None, noData=0, bandNames=None):
     
     """
     Create a layerstack from all files within a directory.
     
     Use:
     
-    path (string): the directory containing the single raster files.
+    images (list): a list of strings containing the full path and file 
+            extension for the single raster files which shall be stacked 
+            together. Will be stacked in the order as given by this list.
     
-    outName (string): the name of the output file.
+    outfile (string): the name of the output file (full path and file 
+            extension).
     
-    outPath (string): the directory to which the output file will be written. 
-            Defaults to the directory given in 'path'.
+    bands (list): a list containing the desired band numbers of the input 
+            images which shall be used for stacking. By this, single bands out 
+            of multiband images can be used. Defaults to "None", which means 
+            that the first band will be used. If more than one band from the 
+            same multiband image shall be used, the filename must be given 
+            again in the "images"-list.
     
-    outFormat (string): the desired format of the output file as provided by the 
+    of (string): the desired format of the output file as provided by the 
             GDAL raster formats (see: http://www.gdal.org/formats_list.html). 
             Defaults to 'GTiFF'.
     
-    noData (int / float): the no-data value to be set. Defaults to the no-data 
-            value of the first input file.
-    
-    dataType (int): the desired data type of the output image, as provided by
-            the GDAL data types (http://www.gdal.org/gdal_8h.html under 
-            'Enumerations'). Defaults to the data type of the input images.
-    
-    createOptions (list): a list of strings, containing advanced raster creation 
+    co (list): a list of strings, containing advanced raster creation 
             options such as band interleave.
             
             Example:
                 createOptions=['interleave=bil']
-                
+        
+    noData (int / float): the no-data value to be set. Defaults to the no-data 
+            value of the first input file.
+            
     bandNames (list): a list of band names for the output file. Defaults to the
             names of the input files.
-            
-    searchString (string): a combination of characters which all input files 
-            must have in common to be used for the layerstack (e.g. file 
-            extensions). May be useful, if 'path' contains also other files 
-            which shall or can not be used by this function.
-    
-    bandIdent (list): a list of strings specifying the band identification 
-            within the file name of each raster to be stacked. Can be useful if 
-            only specific bands shall be used (e.g. for raw Landsat data).
-    
-    filePrint (boolean): 'if True' (default), a list of all files to be stacked
-            is printed. Set to 'False' to suppress printing.
     """
-
-    # check if outfile exists and delete it:
-    if outPath == None:
-        if outName in os.listdir(path):
-            print 'Outfile already exists, will be overwritten!'
-            os.remove(os.path.join(path, outName))
-    else:
-        if outName in os.listdir(outPath):
-            print 'Outfile already exists, will be overwritten!'
-            os.remove(os.path.join(outPath, outName))
         
     gdal.AllRegister()
-    # list all files which shall be stacked:
-    files = os.listdir(path)
-    if searchString != None:
-        files = [item for item in files if searchString in item]
-    files.sort()
-    print files
-    layers = []
-    
-    if bandIdent != None:
-        for f in files:
-            for i in bandIdent:
-                if str(i) in f:
-                    layers.append(f)
-                else:
-                    pass
-    
-        files = layers
-
     # get basic information and create output raster:
-    ds = gdal.Open(os.path.join(path, files[0]), GA_ReadOnly)
+    ds = gdal.Open(images[0], GA_ReadOnly)
     band = ds.GetRasterBand(1)
-    
     proj = ds.GetProjection()
     transform = ds.GetGeoTransform()
     x = ds.RasterXSize
     y = ds.RasterYSize
-    meta = ds.GetMetadata_Dict()
     dtype = band.DataType
-    
+    # nodata
     if noData == None:
         nodata = band.GetNoDataValue()
     else:
         nodata = noData
-    driver = gdal.GetDriverByName(outFormat)
-    
-    if createOptions == None:
-        if outPath == None:
-            ds_out = driver.Create(os.path.join(path, outName), x, y, \
-                        len(files), dtype)
-        else:            
-            ds_out = driver.Create(os.path.join(outPath, outName), x, y, \
-                        len(files), dtype)
+        
+    driver = gdal.GetDriverByName(of)
+    # check for create options
+    if co == None:
+        ds_out = driver.Create(outfile, x, y, len(images), dtype)
     else:
-        if outPath == None:
-            ds_out = driver.Create(os.path.join(path, outName), \
-                        x, y, len(files), dtypee, createOptions)
-        else:
-            ds_out = driver.Create(os.path.join(outPath, outName), \
-                        x, y, len(files), dtype, createOptions)
-                               
+        ds_out = driver.Create(outfile, x, y, len(images), dtype, co)
+    # set projection
     ds_out.SetProjection(proj)
     ds_out.SetGeoTransform(transform)
     band = None
-    
-    # set band names:
-    bands = []
-    bandNum = 1
-    if bandNames == None:
-        for b in files:
-            bands.append(string.join(['Band_', str(bandNum), '= ', b], sep=''))
-            bandNum += 1
-    else:
-        for b in bandNames:
-            bands.append(string.join(['Band_', str(bandNum), '= ', b], sep=''))
-            bandNum += 1
-    
-    ds_out.SetMetadata(bands)
-    
     ds = None
     # loop through all files and stack them:
     band_index = 1
     
-    for name in files:
+    for name in images:
         # progress bar:
         try:
-            pr.progress(name, files)
+            pr.progress(name, images)
         except:
             pass
-        
-        ds = gdal.Open(os.path.join(path, name), GA_ReadOnly)
-        band = ds.GetRasterBand(1)
-        if dataType == None:
-            dtype = band.DataType
+        # open imput image
+        ds = gdal.Open(name, GA_ReadOnly)
+        # check if specific bands are desired
+        if bands == None:
+            band = ds.GetRasterBand(1)
         else:
-            dtype = dataType
-            
+            band = ds.GetRasterBand(bands[band_index-1])
+        # set data type
+        dtype = band.DataType
+        # read data
         data = band.ReadRaster(0, 0, x, y, x, y, dtype)
         band_out = ds_out.GetRasterBand(band_index)
         # create new band names (either from original image or from user input):
         if bandNames == None:
-            bname = string.join(['Band', str(band_index)], sep='_')
-            desc = band.GetDescription()
-            if len(desc) == 0:
-                desc = bname
-        	meta[bname] = desc
-        	band_out.SetDescription(bname)
+            band_out.SetDescription(band.GetDescription())
         else:
-            bname = string.join(['Band', str(band_index)], sep='_')
-            meta[bname] = bandNames[band_index - 1]
             band_out.SetDescription(bandNames[band_index - 1])
             
         band_out.SetNoDataValue(nodata)
@@ -186,6 +122,7 @@ def raster_layerstack(path, outName, outPath=None, outFormat='GTiff', noData=0, 
         ds = None
     
     ds_out = None
+
 
 ######################
 ### Band insertion ###
