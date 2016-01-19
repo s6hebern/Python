@@ -2,6 +2,6 @@
 
 Languages: R and Python
 
-More coming soon ;)
+More coming soon ;-)
 
 Feel free to contact me for suggestions or comments.
