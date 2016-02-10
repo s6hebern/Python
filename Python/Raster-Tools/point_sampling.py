@@ -8,11 +8,11 @@ import numpy as np
 import re
 
 try:
-    import module_progress_bar as pr
+    import progress_bar as pr
 except:
     pass
     
-def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, \
+def point_sampling(raster, shape, bands=None, dataType=ogr.OFTInteger, winRad=0, \
         mode='median', noDataValue=None, removeValue=None, precision=None, \
         names=None):
     
@@ -28,6 +28,10 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, \
             
     shape (string): the shapefile (full path and file extension) containing the 
             points at which positions the raster shall be sampled.
+    
+    bands (list): a list of integers containing the numbers of the desired 
+            bands to be sampled. Defaults to "None", which means that all bands
+            will be used.
             
     dataType (ogr DataType): the ogr data type of the output fields which shall 
             be created. Takes only ogr.OFTInteger (default) and ogr.OFTReal.
@@ -73,75 +77,71 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, \
 
     raster = raster
     rst = gdal.Open(raster, GA_ReadOnly)
-    bands = rst.RasterCount
+    # check if specific bands are desired
+    if bands == None:
+        bands = xrange(rst.RasterCount)
+    else:
+        bands = bands
+    # get raster information
     xSize = rst.RasterXSize
     ySize = rst.RasterYSize
     geotrans = rst.GetGeoTransform()
     xyOrigin = (geotrans[0], geotrans[3])
     pixWidth = geotrans[1]
     pixHeight = geotrans[5]
-    
+    # open shape
     shape = shape
     driver = ogr.GetDriverByName('ESRI Shapefile')
     shp = driver.Open(shape, 1)
     lyr = shp.GetLayer()
-    
     # get points:
     points = [(p.GetGeometryRef().GetX(), p.GetGeometryRef().GetY()) for p in lyr]
-    
     # create field names from raster band names:
     bandNames = sorted(rst.GetMetadata().values())
     if bandNames.__contains__('Area'):
         bandNames.remove('Area')
     if bandNames == []:
         bandNames = [string.join(['Band', str(i)], sep='_') for i in xrange(1, \
-                                                                    bands + 1)]
-    # delete characters which are not in the following list:
-    bandNames = [re.sub(r'[^a-zA-Z0-9_-]', r'', str(i)) for i in bandNames]
-    
-    fieldNames = []
-    
-    if names == None:
-        # fields in shapefiles may contain a maximum of 10 characters:
-        for name in bandNames:
-            if len(name) > 10:
-                fieldNames.append(name[0:10])
-            else:
-                fieldNames.append(name)
-    else:
-        fieldNames = [re.sub(r'[^a-zA-Z0-9_-]', r'', str(i)) for i in names]
-    
+                                                                    len(bands) + 1)]
     # loop through all bands, create fields and write values:
-    for f in xrange(bands):
-        
-        pr.progress(f, xrange(bands))
-        
-        b = rst.GetRasterBand(f + 1)
+    for f in xrange(len(bands)):
+        # progress bar
+        try:
+            pr.progress(f, xrange(len(bands)))
+        except:
+            pass
+        # get band
+        if bands == None:
+            b = rst.GetRasterBand(bands[f] + 1)
+        else:
+            b = rst.GetRasterBand(bands[f])
         dt = b.DataType
-        
+        # get band name and create field name (max length is 10 characters)
+        bName = b.GetDescription()
+        bName = re.sub(r'[^a-zA-Z0-9_-]', r'', str(bName))
+        if len(bName) > 10:
+            bName = bName[0:10]
         # get maximum value to set field width (valid values only):
         maxVal = int(b.ComputeRasterMinMax()[1])
-
         b = None
         # check if fields already exist:
-        if str(fieldNames[f]) in lyr.GetFeature(0).keys():
+        if bName in lyr.GetFeature(0).keys():
             pass
         else:
-            field = ogr.FieldDefn(str(fieldNames[f]), dataType)
+            field = ogr.FieldDefn(bName, dataType)
             if precision == None:
                 field.SetWidth(len(str(maxVal)))
             else:
                 field.SetWidth(len(str(maxVal)) + precision + 1)
                 field.SetPrecision(precision)
             lyr.CreateField(field)
-        
         # loop through all points and get values:
         for point in xrange(len(points)):
             # compute offset:
             xOff = int((points[point][0] - xyOrigin[0]) / pixWidth)
             yOff = int((points[point][1] - xyOrigin[1]) / pixHeight)
             # get band:
-            band = rst.GetRasterBand(f + 1)
+            band = rst.GetRasterBand(bands[f] + 1)
             noData = band.GetNoDataValue()
             if noData == None and noDataValue != None:
                 noData = noDataValue
@@ -193,9 +193,7 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, \
                         data = np.nanmax(np.ma.masked_invalid(window))
                     elif mode == 'majority':
                         data = np.bincount(window.flatten()).argmax()
-
             # convert to desired data type:
-
             if dataType == ogr.OFTInteger and data != None:
                 val = int(data)
             elif dataType == ogr.OFTInteger and data == None:
@@ -208,10 +206,10 @@ def point_sampling(raster, shape, dataType=ogr.OFTInteger, winRad=0, \
                 raise(Warning('Invalid Data Type assigned! Function takes only ogr.OFTInteger and ogr.OFTReal'))
             # set value:
             feat = lyr.GetFeature(point)
-            feat.SetField(str(fieldNames[f]), val)
+            feat.SetField(bName, val)
             lyr.SetFeature(feat)
             feat = None
-    
+    # clean up
     rst = None
     lyr = None
     shp = None
