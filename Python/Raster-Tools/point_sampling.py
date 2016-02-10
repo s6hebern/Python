@@ -31,7 +31,7 @@ def point_sampling(raster, shape, bands=None, dataType=ogr.OFTInteger, winRad=0,
     
     bands (list): a list of integers containing the numbers of the desired 
             bands to be sampled. Defaults to "None", which means that all bands
-            will be used.
+            will be used. Counting starts at 1.
             
     dataType (ogr DataType): the ogr data type of the output fields which shall 
             be created. Takes only ogr.OFTInteger (default) and ogr.OFTReal.
@@ -96,13 +96,6 @@ def point_sampling(raster, shape, bands=None, dataType=ogr.OFTInteger, winRad=0,
     lyr = shp.GetLayer()
     # get points:
     points = [(p.GetGeometryRef().GetX(), p.GetGeometryRef().GetY()) for p in lyr]
-    # create field names from raster band names:
-    bandNames = sorted(rst.GetMetadata().values())
-    if bandNames.__contains__('Area'):
-        bandNames.remove('Area')
-    if bandNames == []:
-        bandNames = [string.join(['Band', str(i)], sep='_') for i in xrange(1, \
-                                                                    len(bands) + 1)]
     # loop through all bands, create fields and write values:
     for f in xrange(len(bands)):
         # progress bar
@@ -116,11 +109,15 @@ def point_sampling(raster, shape, bands=None, dataType=ogr.OFTInteger, winRad=0,
         else:
             b = rst.GetRasterBand(bands[f])
         dt = b.DataType
-        # get band name and create field name (max length is 10 characters)
-        bName = b.GetDescription()
-        bName = re.sub(r'[^a-zA-Z0-9_-]', r'', str(bName))
-        if len(bName) > 10:
-            bName = bName[0:10]
+        # create field names
+        if names == None:
+            # get band name and create field name (max length is 10 characters)
+            bName = b.GetDescription()
+            bName = re.sub(r'[^a-zA-Z0-9_-]', r'', str(bName))
+            if len(bName) > 10:
+                bName = bName[0:10]
+        else:
+            bName = names[f]
         # get maximum value to set field width (valid values only):
         maxVal = int(b.ComputeRasterMinMax()[1])
         b = None
