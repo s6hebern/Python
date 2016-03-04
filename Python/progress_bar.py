@@ -1,4 +1,12 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+"""
+date: Fri Mar  4 12:59:37 2016
+user: hendrik
+"""
+
+import sys
 
 def progress(iterator, iterable):
 
@@ -18,16 +26,16 @@ def progress(iterator, iterable):
     
     percent = range(5, 105, 5)
     if len(iterable) == 0:
-        print 'Iterable object has length 0!'
+        sys.stdout.write('Iterable object has length 0!')
     else:
         if iterator == iterable[0]:
-            print 'Progress (%): ' ,
+            sys.stdout.write('Progress (%): ' ,)
         else:
             for i in percent:
                 if iterator == round((len(iterable) - 1) * i / 100):
                     if i % 10 == 5:
-                        print '.' ,
+                        sys.stdout.write( '.' ,)
                     else:
-                        print i ,
+                        sys.stdout.write(str(i) ,)
             if iterator == iterable[-1]:
-                print '\n',
+                sys.stdout.write('\n',)
