@@ -19,6 +19,10 @@ def progress(iterator, iterable):
     iterator: the iterator of the loop.
     
     iterable: the iterable object to which the loop is applied.
+    
+    Example:
+        for i in range(100):
+            progress(i, range(100))
     """
 
     iterator = list(iterable).index(iterator)
@@ -34,8 +38,8 @@ def progress(iterator, iterable):
             for i in percent:
                 if iterator == round((len(iterable) - 1) * i / 100):
                     if i % 10 == 5:
-                        sys.stdout.write( '.' ,)
+                        sys.stdout.write( '. ' ,)
                     else:
-                        sys.stdout.write(str(i) ,)
+                        sys.stdout.write(str(i) + ' ',)
             if iterator == iterable[-1]:
                 sys.stdout.write('\n',)
