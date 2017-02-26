@@ -155,6 +155,7 @@ regularGridPoints <- function(xmin, ymin, xmax, ymax, stepx, stepy, outfile,
   # plot map if desired
   if (show == T) {
     print("Drawing map...")
+    print("This may take a while, even after the process itself is finished, so stay patient.")
     mapData <- flatgrid
     coordinates(mapData) <- c("X", "Y")
     proj4string(mapData) <- crs_out
@@ -163,7 +164,7 @@ regularGridPoints <- function(xmin, ymin, xmax, ymax, stepx, stepy, outfile,
     }
     mapData <- as.data.frame(mapData)
     # get initial map
-    map <- get_map(location=make_bbox(lon=X, lat=Y, data=mapData), zoom=calc_zoom(lon=X, lat=Y, data=mapData)-2,
+    map <- get_map(location=make_bbox(lon=X, lat=Y, data=mapData), zoom=calc_zoom(lon=X, lat=Y, data=mapData) - 2,
                    maptype="terrain", source="google", color="bw")
     # plot webmap and add points
     ggmap(map, maprange=F) +
