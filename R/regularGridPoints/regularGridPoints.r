@@ -3,10 +3,12 @@ regularGridPoints <- function(xmin, ymin, xmax, ymax, stepx, stepy, outfile,
 
   #-------------------------------------------------------------------------#
   # check for required package "rgdal", install if necessary
-  list.of.packages <- c("rgdal", "ggmap")
+  list.of.packages <- c("rgdal", "ggmap", "data.table")
   new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
   if(length(new.packages)) install.packages(new.packages)
-  require(rgdal, ggmap)
+  require(rgdal)
+  require(ggmap)
+  require(data.table)
   #-------------------------------------------------------------------------#
   
   xmin_in <- xmin
@@ -126,20 +128,20 @@ regularGridPoints <- function(xmin, ymin, xmax, ymax, stepx, stepy, outfile,
     ylist <- c(ylist, rep(y, times=length(xvals)))
   }
   # combine both lists to one table
-  flatgrid <- data.frame(xlist, ylist)
-  # make SpatialPointsDataFrame and provide coordinate columns
-  coordinates(flatgrid) <- c("xlist", "ylist")
-  # assign current CRS
-  proj4string(flatgrid) <- crs_temp
+  flatgrid <- data.table(xlist, ylist)
+  # if another transform is needed to match output CRS
   epsg_temp <- substr(CRSargs(crs_temp), 
                       as.numeric(regexpr("epsg:", CRSargs(crs_temp)))+5, 
                       as.numeric(regexpr("+proj", CRSargs(crs_temp)))-3)
-  # if another transform is needed to match output CRS
   if (epsg_temp != epsgOut) {
+    # make SpatialPointsDataFrame and provide coordinate columns
+    coordinates(flatgrid) <- c("xlist", "ylist")
+    # assign current CRS
+    proj4string(flatgrid) <- crs_temp
     flatgrid <- spTransform(flatgrid, crs_out)
   }
   # add ID column
-  flatgrid <- as.data.frame(flatgrid)
+  flatgrid <- as.data.table(flatgrid)
   # calculate total number of points for ID
   coordcount <- length(xvals) * length(yvals)
   print(paste("Total number of points created:", coordcount))
@@ -148,7 +150,7 @@ regularGridPoints <- function(xmin, ymin, xmax, ymax, stepx, stepy, outfile,
   # set new column names
   colnames(flatgrid) <- c("ID", "X", "Y")
   # export to csv
-  write.table(flatgrid, file=outfile, sep=",", row.names=F)
+  fwrite(flatgrid, file=outfile, sep=",")
   print(paste("Output written to:", outfile))
   
   #############################################################################
@@ -157,14 +159,15 @@ regularGridPoints <- function(xmin, ymin, xmax, ymax, stepx, stepy, outfile,
     print("Drawing map...")
     print("This may take a while, even after the process itself is finished, so stay patient.")
     mapData <- flatgrid
-    coordinates(mapData) <- c("X", "Y")
-    proj4string(mapData) <- crs_out
+    # if coordinates are not geographic
     if (epsgOut != "4326") {
       mapData <- spTransform(mapData, CRS("+init=epsg:4326"))
+      coordinates(mapData) <- c("X", "Y")
+      proj4string(mapData) <- crs_out
+      mapData <- as.data.table(mapData)
     }
-    mapData <- as.data.frame(mapData)
     # get initial map
-    map <- get_map(location=make_bbox(lon=X, lat=Y, data=mapData), zoom=calc_zoom(lon=X, lat=Y, data=mapData) - 2,
+    map <- get_map(location=make_bbox(lon=X, lat=Y, data=mapData), zoom=calc_zoom(lon=X, lat=Y, data=mapData) - 1,
                    maptype="terrain", source="google", color="bw")
     # plot webmap and add points
     ggmap(map, maprange=F) +
