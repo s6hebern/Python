@@ -1,6 +1,6 @@
 regularGridPoints <- function(xmin, ymin, xmax, ymax, stepx, stepy, outfile, 
                               epsgIn="4326", stepDeg=F, epsgOut="4326", show=F) {
-
+  
   #-------------------------------------------------------------------------#
   # check for required package "rgdal", install if necessary
   list.of.packages <- c("rgdal", "ggmap", "data.table")
@@ -48,27 +48,27 @@ regularGridPoints <- function(xmin, ymin, xmax, ymax, stepx, stepy, outfile,
     #-------------------------------------------------------------------------#
     # if steps are meters
     if (stepDeg == F) {
-        # calculate UTM zone
-        utm_zone <- as.character((floor((mean(c(xmin_in, xmax_in)) + 180)/6) %% 60) + 1)
-        print(paste("Transforming to UTM, Zone ", as.character(utm_zone), "N", sep=""))
-        crs_utm <- CRS(paste("+init=epsg:326", utm_zone, sep=""))
-        # transform input coordinates to UTM
-        XY_utm <- spTransform(XY_in, CRSobj=crs_utm)
-        crs_temp <- crs_utm
-        # extract temporary corner coordinates (now in UTM)
-        xmin_utm <- as.numeric(XY_utm[1]$X)
-        ymin_utm <- as.numeric(XY_utm[1]$Y)
-        xmax_utm <- as.numeric(XY_utm[2]$X)
-        ymax_utm <- as.numeric(XY_utm[2]$Y)
-        # calculate all possible distinct x and y values (in UTM)
-        xvals <- seq(xmin_utm, xmax_utm, by=stepx)
-        yvals <- seq(ymin_utm, ymax_utm, by=stepy)
-      } else { # steps are degrees
-        # calculate all possible distinct x and y values (in degrees)
-        xvals <- seq(xmin_in, xmax_in, by=stepx)
-        yvals <- seq(ymin_in, ymax_in, by=stepy)
-        crs_temp <- crs_in
-      }
+      # calculate UTM zone
+      utm_zone <- as.character((floor((mean(c(xmin_in, xmax_in)) + 180)/6) %% 60) + 1)
+      print(paste("Transforming to UTM, Zone ", as.character(utm_zone), "N", sep=""))
+      crs_utm <- CRS(paste("+init=epsg:326", utm_zone, sep=""))
+      # transform input coordinates to UTM
+      XY_utm <- spTransform(XY_in, CRSobj=crs_utm)
+      crs_temp <- crs_utm
+      # extract temporary corner coordinates (now in UTM)
+      xmin_utm <- as.numeric(XY_utm[1]$X)
+      ymin_utm <- as.numeric(XY_utm[1]$Y)
+      xmax_utm <- as.numeric(XY_utm[2]$X)
+      ymax_utm <- as.numeric(XY_utm[2]$Y)
+      # calculate all possible distinct x and y values (in UTM)
+      xvals <- seq(xmin_utm, xmax_utm, by=stepx)
+      yvals <- seq(ymin_utm, ymax_utm, by=stepy)
+    } else { # steps are degrees
+      # calculate all possible distinct x and y values (in degrees)
+      xvals <- seq(xmin_in, xmax_in, by=stepx)
+      yvals <- seq(ymin_in, ymax_in, by=stepy)
+      crs_temp <- crs_in
+    }
     #-------------------------------------------------------------------------#
   } else if (epsgIn == "4326" & epsgOut != "4326") { # input CRS is geographic, output CRS it other
     #-------------------------------------------------------------------------#
@@ -93,28 +93,28 @@ regularGridPoints <- function(xmin, ymin, xmax, ymax, stepx, stepy, outfile,
       xvals <- seq(xmin_out, xmax_out, by=stepx)
       yvals <- seq(ymin_out, ymax_out, by=stepy)
       crs_temp <- crs_out
-      } else { # steps in degrees --> throw error message
-        stop("If neither your input nor your output coordinate systems are 
+    } else { # steps in degrees --> throw error message
+      stop("If neither your input nor your output coordinate systems are 
            geographic (EPSG: 4326), you can't use stepDeg=TRUE! Please set 
            it to FALSE and provide stepx and stepy in meters!")
-      }
-    #-------------------------------------------------------------------------#
-  } else if (epsgIn != "4326" & epsgOut == "4326") { # input CRS is metric, output CRS it geographic
-    #-------------------------------------------------------------------------#
-    # if steps are in meters
-    if (stepDeg == F) {
-      # calculate all possbile distinct x and y values (in neters)
-      xvals <- seq(xmin_in, xmax_in, by=stepx)
-      yvals <- seq(ymin_in, ymax_in, by=stepy)
-      crs_temp <- crs_in
-    } else { # steps are in degrees
-      # calculate all possible distinct x and y values (in degrees)
-      xvals <- seq(xmin_out, xmax_out, by=stepx)
-      yvals <- seq(ymin_out, ymax_out, by=stepy)
-      crs_temp <- crs_out
     }
     #-------------------------------------------------------------------------#
-  }
+    } else if (epsgIn != "4326" & epsgOut == "4326") { # input CRS is metric, output CRS it geographic
+      #-------------------------------------------------------------------------#
+      # if steps are in meters
+      if (stepDeg == F) {
+        # calculate all possbile distinct x and y values (in neters)
+        xvals <- seq(xmin_in, xmax_in, by=stepx)
+        yvals <- seq(ymin_in, ymax_in, by=stepy)
+        crs_temp <- crs_in
+      } else { # steps are in degrees
+        # calculate all possible distinct x and y values (in degrees)
+        xvals <- seq(xmin_out, xmax_out, by=stepx)
+        yvals <- seq(ymin_out, ymax_out, by=stepy)
+        crs_temp <- crs_out
+      }
+      #-------------------------------------------------------------------------#
+    }
   
   #############################################################################
   # create output
@@ -161,13 +161,13 @@ regularGridPoints <- function(xmin, ymin, xmax, ymax, stepx, stepy, outfile,
     mapData <- flatgrid
     # if coordinates are not geographic
     if (epsgOut != "4326") {
-      mapData <- spTransform(mapData, CRS("+init=epsg:4326"))
       coordinates(mapData) <- c("X", "Y")
       proj4string(mapData) <- crs_out
+      mapData <- spTransform(mapData, CRS("+init=epsg:4326"))
       mapData <- as.data.table(mapData)
     }
     # get initial map
-    map <- get_map(location=make_bbox(lon=X, lat=Y, data=mapData), zoom=calc_zoom(lon=X, lat=Y, data=mapData) - 1,
+    map <- get_map(location=make_bbox(lon=X, lat=Y, data=mapData), zoom=calc_zoom(lon=X, lat=Y, data=mapData) - 2,
                    maptype="terrain", source="google", color="bw")
     # plot webmap and add points
     ggmap(map, maprange=F) +
