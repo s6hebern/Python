@@ -121,8 +121,7 @@ def create_mask(image, values, valRange=True, dataBand=None, outName=None, \
 ### APPLY MASK ###
 ##################
 
-def apply_mask(image, maskImage, outName, outPath=None, of='Gtiff', co=None, \
-               outExtent='image', interpolation='nearest'):
+def apply_mask(image, maskImage, outName, outPath=None, of='Gtiff', co=None, keepWarp=False):
     """
     Apply a mask to a (multiband) image. The mask will be multiplied with the 
     input image. Both images have to cover the same area, but may differ in 
@@ -149,113 +148,95 @@ def apply_mask(image, maskImage, outName, outPath=None, of='Gtiff', co=None, \
 
             Example:
                 co=['interleave=bil']
-
-    outExtent (string): the desired extent and resolution of the output image,
-            if input and mask image have different dimensions. 
-            Possible values are:
-                - 'image' (default)
-                - 'mask'
-
-    interpolation (string): the interpolation method to be used if input and 
-            mask image have different dimensions. The image specified in 
-            'outExtent' will then be resampled using this interpolation method.
-            Possible values are:
-                - 'nearest' (default)
-                - 'bilinear'
-                - 'bicubic'
-                - 'cubic'            
+    keepWarp (boolean): if image and maskImage have different projection, 
+            resolution or extent, the mask image will be warped using gdalwarp.
+            If keepWarp is True, this warped mask image will not be deleted.
+            Defaults to False (will be deleted).
     """
 
     # check if outfile exists and delete it:
     path = os.path.dirname(image)
 
     if outPath == None:
-        if outName in os.listdir(path):
-            print 'Outfile already exists, will be overwritten!'
-            os.remove(os.path.join(path, outName))
+        pass
     else:
-        if outName in os.listdir(outPath):
-            print 'Outfile already exists, will be overwritten!'
-            os.remove(os.path.join(outPath, outName))
+        path = outPath
+
+    if outName in os.listdir(path):
+        print 'Outfile already exists, will be overwritten!'
+        os.remove(os.path.join(path, outName))
 
     gdal.AllRegister()
 
     driver = gdal.GetDriverByName(of)
 
+    # get information of input raster
     ds = gdal.Open(image, GA_ReadOnly)
     cols = ds.RasterXSize
     rows = ds.RasterYSize
     bands = ds.RasterCount
+    img_proj = ds.GetProjection()
+    img_geo = ds.GetGeoTransform()
+
+    # get information of mask
+    mask_ds = gdal.Open(maskImage, GA_ReadOnly)
+    mask_proj = mask_ds.GetProjection()
+    mask_geo = mask_ds.GetGeoTransform()
+
+    # check if inout image and mask share the same projection, resolution and extent
+    if img_proj == mask_proj and img_geo == mask_geo:
+        pass
+    else:
+        mask_ds = None
+        # warp mask to match input image
+        print 'Mask image does not match input image. Transforming mask now...'
+        # get bounding box of input image
+        minX = img_geo[0]
+        maxY = img_geo[3]
+        pixSizeX = img_geo[1]
+        pixSizeY = img_geo[5]
+        maxX = minX + (cols * pixSizeX)
+        minY = maxY + (rows * pixSizeY)
+        ## set up gdalwarp command
+        tempfile = os.path.join(path, os.path.splitext(maskImage)[0] + '_warped' + os.path.splitext(maskImage)[1])
+        if os._exists(tempfile):
+            os.remove(tempfile)
+        of = '-of GTiff'
+        bb = '-te %s %s %s %s '%(minX, minY, maxX, maxY)
+        res = '-tr %s %s '%(pixSizeX, pixSizeY)
+        epsg = int(img_proj.split('''AUTHORITY["EPSG","''')[-1].strip('''"]]'''))
+        proj = ''' -t_srs epsg:%s ''' %(epsg)
+        warpcmd = string.join(['gdalwarp', of, bb, res, proj, maskImage, tempfile], sep=' ')
+        # execute
+        os.system(warpcmd)
+        # open new file
+        maskImage = tempfile
+        mask_ds = gdal.Open(maskImage, GA_ReadOnly)
+
     # open mask image:
-    maskds = gdal.Open(maskImage, GA_ReadOnly)
-    maskBand = maskds.GetRasterBand(1)
-    mask = maskBand.ReadAsArray(0, 0, maskds.RasterXSize, maskds.RasterYSize)
+    maskBand = mask_ds.GetRasterBand(1)
+    mask = maskBand.ReadAsArray(0, 0, mask_ds.RasterXSize, mask_ds.RasterYSize)
+    mask_ds = None
 
     # create (empty) output image:
-    if outExtent == 'image':
-        if outPath == None:
-            if co == None:
-                ds_out = driver.Create(os.path.join(path, outName), \
-                                   ds.RasterXSize, ds.RasterYSize, bands, \
-                                   ds.GetRasterBand(1).DataType)
-            else:
-                ds_out = driver.Create(os.path.join(path, outName), \
-                                       ds.RasterXSize, ds.RasterYSize, bands, \
-                                       ds.GetRasterBand(1).DataType, co)
-        else:
-            if co == None:
-                ds_out = driver.Create(os.path.join(outPath, outName), \
-                                   ds.RasterXSize, ds.RasterYSize, bands, \
-                                   ds.GetRasterBand(1).DataType)
-            else:
-                ds_out = driver.Create(os.path.join(outPath, outName), \
-                                       ds.RasterXSize, ds.RasterYSize, bands, \
-                                       ds.GetRasterBand(1).DataType, co)
-
-        ds_out.SetProjection(ds.GetProjection())
-        ds_out.SetGeoTransform(ds.GetGeoTransform())
-
+    if co == None:
+        ds_out = driver.Create(os.path.join(path, outName), \
+                               ds.RasterXSize, ds.RasterYSize, bands, \
+                               ds.GetRasterBand(1).DataType)
     else:
-        if outPath == None:
-            if co == None:
-                ds_out = driver.Create(os.path.join(path, outName), \
-                                       maskds.RasterXSize, maskds.RasterYSize, bands, \
-                                       ds.GetRasterBand(1).DataType)
-            else:
-                ds_out = driver.Create(os.path.join(path, outName), \
-                                       maskds.RasterXSize, maskds.RasterYSize, bands, \
-                                       ds.GetRasterBand(1).DataType, co)
-        else:
-            if co == None:
-                ds_out = driver.Create(os.path.join(outPath, outName), \
-                                       maskds.RasterXSize, maskds.RasterYSize, bands, \
-                                       ds.GetRasterBand(1).DataType)
-            else:
-                ds_out = driver.Create(os.path.join(outPath, outName), \
-                                       maskds.RasterXSize, maskds.RasterYSize, bands, \
-                                       ds.GetRasterBand(1).DataType, co)
+        ds_out = driver.Create(os.path.join(path, outName), \
+                                ds.RasterXSize, ds.RasterYSize, bands, \
+                                ds.GetRasterBand(1).DataType, co)
 
-        ds_out.SetProjection(maskds.GetProjection())
-        ds_out.SetGeoTransform(maskds.GetGeoTransform())
-
+    ds_out.SetProjection(ds.GetProjection())
+    ds_out.SetGeoTransform(ds.GetGeoTransform())
     ds_out.SetMetadata(ds.GetMetadata())
 
     # apply mask to all bands:
     for b in xrange(1, bands + 1):
         band = ds.GetRasterBand(b)
         data = band.ReadAsArray(0, 0, cols, rows)
-        # if mask and image have different size, resample one of them depending
-        # on users choice:
-        if mask.shape != data.shape:
-            if outExtent == 'image':
-                re_mask = misc.imresize(mask, data.shape, interp=interpolation)
-                data_out = re_mask * data
-            else:
-                re_data = misc.imresize(data, mask.shape, interp=interpolation)
-                data_out = mask * re_data
-
-        else:
-            data_out = mask * data
+        data_out = mask * data
         # write masked band:
         b_out = ds_out.GetRasterBand(b)
         b_out.WriteArray(data_out)
@@ -267,8 +248,11 @@ def apply_mask(image, maskImage, outName, outPath=None, of='Gtiff', co=None, \
         except:
             pass
 
+    # clean up
     ds_out = None
     ds = None
+    if keepWarp == False:
+        os.remove(tempfile)
 
 
 ############################
