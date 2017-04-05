@@ -269,3 +269,79 @@ def apply_mask(image, maskImage, outName, outPath=None, of='Gtiff', co=None, \
 
     ds_out = None
     ds = None
+
+
+############################
+### COMBINE MASKS TO ONE ###
+############################
+
+def combine_masks(masks, outName, outPath=None, of='GTiff', co=None):
+    """
+    Apply a mask to a (multiband) image. The mask will be multiplied with the 
+    input image. Both images have to cover the same area, but may differ in 
+    resolution.
+
+    Use:
+
+    masks (list): the image masks (full paths and file extensions).
+
+    outName (string): the name of the output file (with file extension).
+
+    outPath (string): the directory to which the output file will be written. 
+            Defaults to the parent directory of the first mask image.
+
+    of (string): the desired format of the output file as provided by the 
+            GDAL raster formats (see: http://www.gdal.org/formats_list.html). 
+            Defaults to 'GTiFF'.
+
+    co (list): a list of strings, containing advanced raster creation 
+            options such as band interleave.
+
+            Example:
+                co=['interleave=bil']
+    """
+
+    # check if at least two masks are given
+    if len(masks) < 2:
+        print 'ERROR: You have to provide two images at least!'
+        return
+
+    gdal.AllRegister()
+    driver = gdal.GetDriverByName(of)
+
+    ds = gdal.Open(masks[0], GA_ReadOnly)
+    cols = ds.RasterXSize
+    rows = ds.RasterYSize
+    data = ds.ReadAsArray(0, 0, cols, rows)
+
+    # create initial output image
+    if outPath == None:
+        path = os.path.dirname(masks[0])
+    else:
+        path = outPath
+
+    outFile = os.path.join(path, outName)
+
+    if co == None:
+        ds_out = driver.Create(outFile, cols, rows, 1, 1)
+    else:
+        ds_out = driver.Create(outFile, cols, rows, 1, 1, co)
+
+    # set projection and geotransform
+    ds_out.SetProjection(ds.GetProjection())
+    ds_out.SetGeoTransform(ds.GetGeoTransform())
+
+    for mask in xrange(1, len(masks)):
+        m = gdal.Open(masks[mask], GA_ReadOnly)
+        mData = m.ReadAsArray(0, 0, cols, rows)
+
+        data = data * mData
+
+    # write final array to file
+    b_out = ds_out.GetRasterBand(1)
+    b_out.WriteArray(data)
+
+    # clean up
+    b_out = None
+    ds_out = None
+    ds = None
