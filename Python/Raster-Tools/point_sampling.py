@@ -11,31 +11,31 @@ try:
     import progress_bar as pr
 except:
     pass
-    
-def point_sampling(raster, shape, bands=None, dataType=ogr.OFTInteger, winRad=0, \
-        mode='median', noDataValue=None, removeValue=None, precision=None, \
-        names=None):
-    
+
+
+def point_sampling(raster, shape, bandList=None, dataType=ogr.OFTInteger, winRad=0, \
+                   mode='median', noDataValue=None, removeValue=None, precision=None, \
+                   names=None):
     """
     Point sampling of a point shapefile and an image file. Creates a new 
     attribute field for each raster band containing the values at the respective
     point positions or the desired statistical value within a window around 
-    these positions.
-    
+    these positions. Assumes that both datasets ahre the same coordinate system!!!
+
     Use:
-    
+
     raster (string): the image file (full path and file extension).
-            
+
     shape (string): the shapefile (full path and file extension) containing the 
             points at which positions the raster shall be sampled.
-    
-    bands (list): a list of integers containing the numbers of the desired 
+
+    bandList (list): a list of integers containing the numbers of the desired 
             bands to be sampled. Defaults to "None", which means that all bands
             will be used. Counting starts at 1.
-            
+
     dataType (ogr DataType): the ogr data type of the output fields which shall 
             be created. Takes only ogr.OFTInteger (default) and ogr.OFTReal.
-            
+
     winRad (integer): the radius of the window around the respective point 
             position. For example, a value of 4 will create a window of 8x8 
             pixels (4 pixels to each direction). Defaults to 0, which means that 
@@ -47,7 +47,7 @@ def point_sampling(raster, shape, bands=None, dataType=ogr.OFTInteger, winRad=0,
             If the origin of the sampling window is inside the raster, but the
             window would cross the edges, it will also be resized to the maximum
             possible size.
-            
+
     mode (string): the statistical value which shall be taken from the window. 
             Possible values are:
                 - 'median' (default)
@@ -55,18 +55,18 @@ def point_sampling(raster, shape, bands=None, dataType=ogr.OFTInteger, winRad=0,
                 - 'min'
                 - 'max'
                 - 'majority' (most frequent value, only for integer values)
-    
+
     noDataValue (integer): the desired nodata-value, if the input image does not
             have one or it shall be changed for the shapefile.
-    
+
     removeValue (integer): the nodata-value of the input image, which will be deleted
             from the sampling window before calculating the desired statistic.
             Defaults to NONE (which means that no value shall be deleted).
-            
+
     precision (integer): the precision of the output attribute field, if 
             floating numbers are desired. If not specified, precision will be 
             set to the length of the maximum value.
-            
+
     names (list): a list of the field names for the output attribute fields, 
             with a maximum length of 10 characters. If not specified, the band 
             names of the raster file will be taken as field names. If they 
@@ -78,10 +78,10 @@ def point_sampling(raster, shape, bands=None, dataType=ogr.OFTInteger, winRad=0,
     raster = raster
     rst = gdal.Open(raster, GA_ReadOnly)
     # check if specific bands are desired
-    if bands == None:
-        bands = xrange(rst.RasterCount)
+    if bandList == None:
+        bands = [r for r in xrange(rst.RasterCount)]
     else:
-        bands = bands
+        bands = bandList
     # get raster information
     xSize = rst.RasterXSize
     ySize = rst.RasterYSize
@@ -104,7 +104,7 @@ def point_sampling(raster, shape, bands=None, dataType=ogr.OFTInteger, winRad=0,
         except:
             pass
         # get band
-        if bands == None:
+        if bandList == None:
             b = rst.GetRasterBand(bands[f] + 1)
         else:
             b = rst.GetRasterBand(bands[f])
@@ -154,17 +154,17 @@ def point_sampling(raster, shape, bands=None, dataType=ogr.OFTInteger, winRad=0,
                 if xOff < 0:
                     winX = winRad * 2 - abs(xOff)
                     xOff = 0
-                    
+
                 if yOff < 0:
                     winY = winRad * 2 - abs(yOff)
                     yOff = 0
-                # check if window size still fits into raster without crossing 
+                # check if window size still fits into raster without crossing
                 # the edges. If not, set window size to maximum possible value:
                 if xOff + (winRad * 2) > xSize:
                     winX = xSize - xOff
                 else:
                     winX = winRad * 2
-                    
+
                 if yOff + (winRad * 2) > ySize:
                     winY = ySize - yOff
                 else:
@@ -173,7 +173,7 @@ def point_sampling(raster, shape, bands=None, dataType=ogr.OFTInteger, winRad=0,
                 window = band.ReadAsArray(xOff, yOff, winX, winY)
                 # delete desired removeValue from window:
                 if removeValue != None:
-                    #dt = gdal_array.GDALTypeCodeToNumericTypeCode(dt)
+                    # dt = gdal_array.GDALTypeCodeToNumericTypeCode(dt)
                     dt = type(window[0, 0])
                     window = window[window != dt(removeValue)]
                 if window.size == 0:
@@ -198,9 +198,9 @@ def point_sampling(raster, shape, bands=None, dataType=ogr.OFTInteger, winRad=0,
             elif dataType == ogr.OFTReal and data != None:
                 val = float(data)
             elif dataType == ogr.OFTReal and data == None:
-                val = int(noData)
+                val = float(noData)
             else:
-                raise(Warning('Invalid Data Type assigned! Function takes only ogr.OFTInteger and ogr.OFTReal'))
+                raise (Warning('Invalid Data Type assigned! Function takes only ogr.OFTInteger and ogr.OFTReal'))
             # set value:
             feat = lyr.GetFeature(point)
             feat.SetField(bName, val)
