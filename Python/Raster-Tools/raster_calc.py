@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import os, sys, time
+import os, sys, time, datetime
 from optparse import OptionParser, OptionGroup
 
 from osgeo import gdal
@@ -144,19 +144,18 @@ def run():
     else:
         print 'Executing %s ...' % __file__
         if str(mode) == 'add':
-            print 'Summing up %s and %s ...' %(os.path.basename(a), os.path.basename(b))
+            print 'Summing up \n %s - band %s - \n and \n %s - band % s -' %(os.path.basename(a), band_a, os.path.basename(b), band_b)
         elif str(mode) == 'subtract':
-            print 'Subtracting %s from %s ...' %(os.path.basename(b), os.path.basename(a))
+            print 'Subtracting \n %s - band %s - \n from \n %s - band % s -' %(os.path.basename(b), band_b, os.path.basename(a), band_a)
         elif str(mode) == 'multiply':
-            print 'Multiplying %s and %s ...' %(os.path.basename(a), os.path.basename(b))
+            print 'Multiplying \n %s - band %s - \n and \n %s - band % s -' %(os.path.basename(a), band_a, os.path.basename(b), band_b)
         elif str(mode) == 'divide':
-            print 'Dividing %s by %s ...' %(os.path.basename(a), os.path.basename(b))
+            print 'Dividing \n %s - band %s - \n by \n %s - band % s -'  %(os.path.basename(a), band_a, os.path.basename(b), band_b)
         raster_calc(opts[0], opts[1], opts[2], opts[3], opts[4], opts[5], opts[6], opts[7])
         print 'Done!'
 
 # execute
 if __name__ == '__main__':
-    import datetime
     start = time.time()
     run()
     print 'Duration (hh:mm:ss): \n %s' %(datetime.timedelta(seconds=time.time() - start))
