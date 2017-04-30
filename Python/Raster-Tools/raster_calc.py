@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 
+import os, sys, time
+from optparse import OptionParser, OptionGroup
+
 from osgeo import gdal
 from osgeo.gdalconst import *
 import numpy as np
 
-def raster_calc(a, b, outfile, mode, band_a=None, band_b=None, of='GTiff', co=None):
+__version__ = 1.0
+
+def raster_calc(img_a, img_b, mode, outfile, band_a=None, band_b=None, of='GTiff', co=None):
     
     """
     Combine two rasters based on one of the four basic arithmetic operations.
@@ -18,13 +23,13 @@ def raster_calc(a, b, outfile, mode, band_a=None, band_b=None, of='GTiff', co=No
     b (string): second input image (full path and file extension). May contain 
             multiple bands.
     
-    outfile (string): the output image (full path and file extension).
-    
     mode (string): the arithmetic operation. Must be one of:
             - 'add'
             - 'subtract'
             - 'multiply'
             - 'divide'
+
+    outfile (string): the output image (full path and file extension).
     
     band_a (integer): the desired band of the first input image which shall be
             used for the calculation, if it is a multiband image.
@@ -40,7 +45,7 @@ def raster_calc(a, b, outfile, mode, band_a=None, band_b=None, of='GTiff', co=No
             options such as band interleave.
             
             Example:
-                createOptions=['interleave=bil']
+                co=['interleave=bil','tiled=yes']
     """    
 
 
@@ -48,8 +53,8 @@ def raster_calc(a, b, outfile, mode, band_a=None, band_b=None, of='GTiff', co=No
     driver = gdal.GetDriverByName(of)
 
     # read data:    
-    ds_a = gdal.Open(a, GA_ReadOnly)
-    ds_b = gdal.Open(b, GA_ReadOnly)
+    ds_a = gdal.Open(img_a, GA_ReadOnly)
+    ds_b = gdal.Open(img_b, GA_ReadOnly)
 
     if band_a != None:
         b_a = ds_a.GetRasterBand(band_a)
@@ -92,3 +97,66 @@ def raster_calc(a, b, outfile, mode, band_a=None, band_b=None, of='GTiff', co=No
     ds_out = None
     ds_b = None
     ds_a = None
+
+def run():
+    # create parser
+    parser = OptionParser('%prog -a <image_a> -b <image_b> -m <mode> -o <outfile> [options]', version='%prog 1.0')
+    parser.add_option('-a', '--image_a', dest='img_a', help='<file> First input image')
+    parser.add_option('-b', '--image_b', dest='img_b', help='<file> Second input image')
+    parser.add_option('-m', '--mode', dest='mode', help='<string> Arithmetic operation to run (one of "add", "subtract", "multiply", "divide"')
+    parser.add_option('-o', '--output', dest='outfile', help='<file> Output image')
+    group = OptionGroup(parser, 'Optional Arguments', '')
+    group.add_option('-x', '--band_a', dest='band_a', default=1, help='<integer> The desired band of the first input image which shall be used for the calculation, if it is a multiband image')
+    group.add_option('-y', '--band_b', dest='band_b', default=1, help='<integer> The desired band of the second input image which shall be used for the calculation, if it is a multiband image')
+    group.add_option('-f', '--out_format', dest='of', default='GTiff', help='<string> File format of output image')
+    group.add_option('-c', '--create_options', dest='co', help='<sequence of strings> Advanced raster creation options, such as band interleave. Example: -c "num_threads=all_cpus","tiled=yes"')
+    parser.add_option_group(group)
+    
+    (options, args) = parser.parse_args()
+
+    # mandatory options    
+    a = options.img_a
+    b = options.img_b
+    mode = options.mode
+    outfile = options.outfile
+    # optional options
+    band_a = options.band_a
+    band_b = options.band_b
+    of = options.of
+    co = options.co.split(',')
+    # sort options to be able to parse them correctly even when user input is mixed up
+    opts = [a, b, mode, outfile, band_a, band_b, of, co]
+    index = 0
+    for o in range(0,len(opts)):
+        # find options not provided with their keyword
+        if opts[o] == None:
+            try:
+                # assign option from list of arguments
+                opts[o] = args[index]
+                index += 1
+            except:
+                break
+    # check user input
+    if None in opts[0:4]:
+        parser.error('Not all mandatory arguments have been provided! Please check your input and try again.')
+        print parser.usage
+        exit(0)
+    else:
+        print 'Executing %s ...' % __file__
+        if str(mode) == 'add':
+            print 'Summing up %s and %s ...' %(os.path.basename(a), os.path.basename(b))
+        elif str(mode) == 'subtract':
+            print 'Subtracting %s from %s ...' %(os.path.basename(b), os.path.basename(a))
+        elif str(mode) == 'multiply':
+            print 'Multiplying %s and %s ...' %(os.path.basename(a), os.path.basename(b))
+        elif str(mode) == 'divide':
+            print 'Dividing %s by %s ...' %(os.path.basename(a), os.path.basename(b))
+        raster_calc(opts[0], opts[1], opts[2], opts[3], opts[4], opts[5], opts[6], opts[7])
+        print 'Done!'
+
+# execute
+if __name__ == '__main__':
+    import datetime
+    start = time.time()
+    run()
+    print 'Duration (hh:mm:ss): \n %s' %(datetime.timedelta(seconds=time.time() - start))
