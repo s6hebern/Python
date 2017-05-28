@@ -2,16 +2,17 @@
 
 # low-pass filter using pixel notation
 
-import os, sys, time, gdal, numpy, string
+import os, sys, time, datetime, gdal, string
+import numpy as np
 from gdalconst import *
-from optparse import OptionParser
+from optparse import OptionParser, OptionGroup
 
 __version__ = 1.0
 
 # lowpass-filter for integer images
-def lowpass_filter(img_in, img_out, window, band=1, of='GTiff, co=None'):
+def lowpass_filter(img_in, img_out, window, mode='mean', band=1, of='GTiff', co=None):
     """
-    Apply a lowpass filter to an image.
+    Apply a lowpass filter to an (integer) image.
 
 
     Use:
@@ -27,6 +28,13 @@ def lowpass_filter(img_in, img_out, window, band=1, of='GTiff, co=None'):
                 image! With a 3x3 filter, 1 pixel will be lost at EACH edge,
                 with a 5x5 filter, 2 pixels, etc.
 
+    mode (string): statistic to be used for filtering. One of:
+            - "mean"
+            - "median"
+            - "min"
+            - "max"
+            NAs are omitted in any case.
+
     band (integer): the desired band of the input image which shall be filtered.
             Counting starts at 1 (default).
 
@@ -40,6 +48,10 @@ def lowpass_filter(img_in, img_out, window, band=1, of='GTiff, co=None'):
             Example:
                 co=['interleave=bil','tiled=yes']
     """
+
+    # set up input correctly
+    window = int(window)
+    band = int(band)
 
     # register all of the GDAL drivers
     gdal.AllRegister()
@@ -57,46 +69,51 @@ def lowpass_filter(img_in, img_out, window, band=1, of='GTiff, co=None'):
 
     # read the input data
     inBand = inDs.GetRasterBand(band)
-    inData = inBand.ReadAsArray(0, 0, cols, rows).astype(numpy.int)
+    inData = inBand.ReadAsArray(0, 0, cols, rows).astype(np.int)
 
     # initiate output array
-    outData = numpy.zeros((rows, cols), numpy.int)
+    outData = np.zeros((rows, cols), np.int)
 
     # do the calculation with array slices:
     rev = list(reversed(range(window)))
-    exp = '('
+    # exp = '('
+    exp = string.join(['np.nan', mode, '(['], sep='')
 
     # set up string command, that will later be evaluated
     for i in range(window):
         for j in rev:
             exp = string.join(
                 [exp, 'inData[', str(i), ':rows-', str(rev[i]), ', ', str(rev[j]), \
-                 ':cols-', str(j), '] + '], sep='')
+                 ':cols-', str(j), '], '], sep='')
 
-    exp = string.join([exp[:-3], ') / ', str(window*window)], sep='')
+    exp = string.join([exp[:-2], '], axis=0)'], sep='')
 
     # evaluate string expression and fill outData with it
-    print 'Filtering image %s with a %sx%s window...' %(os.path.basename(img_in), window, window)
+    print 'Filtering image %s with a %sx%s &s window...' %(os.path.basename(img_in), window, window, mode)
     outData[(window/2):rows-(window/2), (window/2):cols-(window/2)] = eval(exp)
 
-    # for a window of 3x3, exp would look like this:
-    # outData[1:rows-1,1:cols-1] = (inData[0:rows-2, 0:cols-2] + \
-    #                               inData[0:rows-2, 1:cols-1] + \
-    #                               inData[0:rows-2, 2:cols-0] + \
-    #                               inData[1:rows-1, 0:cols-2] + \
-    #                               inData[1:rows-1, 1:cols-1] + \
-    #                               inData[1:rows-1, 2:cols-0] + \
-    #                               inData[2:rows-0, 0:cols-2] + \
-    #                               inData[2:rows-0, 1:cols-1] + \
-    #                               inData[2:rows-0, 2:cols-0]) / 9
+    # for a window of 3x3 for a filter, exp would look like this:
+    # outData[1:rows-1,1:cols-1] = np.nanmean(inData[0:rows-2, 0:cols-2] + \
+    #                                           inData[0:rows-2, 1:cols-1] + \
+    #                                           inData[0:rows-2, 2:cols-0] + \
+    #                                           inData[1:rows-1, 0:cols-2] + \
+    #                                           inData[1:rows-1, 1:cols-1] + \
+    #                                           inData[1:rows-1, 2:cols-0] + \
+    #                                           inData[2:rows-0, 0:cols-2] + \
+    #                                           inData[2:rows-0, 1:cols-1] + \
+    #                                           inData[2:rows-0, 2:cols-0])
 
     # create the output image
     print 'Creating output image %s' %img_out
     driver = gdal.GetDriverByName(of)
-    outDs = driver.Create(img_out, cols, rows, 1, inBand.DataType, co)
+    if co == None:
+        outDs = driver.Create(img_out, cols, rows, 1, inBand.DataType)
+    else:
+        outDs = driver.Create(img_out, cols, rows, 1, inBand.DataType, co)
     if outDs is None:
       print 'Could not create &s' %img_out
       sys.exit(1)
+
     outBand = outDs.GetRasterBand(1)
 
     # write the output data
@@ -123,6 +140,7 @@ def run():
     parser.add_option('-w', '--window_size', dest='win', help='<integer> Integer value for the filter size (3 => 3x3)')
 
     group = OptionGroup(parser, 'Optional Arguments', '')
+    group.add_option('-m', '--mode', dest='mode', default='mean', help='<string> The desired statistical mode for the filter. One of: \n - "mean" \n - "median" \n - "min" \n -"max". NAs are omitted in any case.')
     group.add_option('-b', '--band', dest='band', default=1, help='<integer> The desired band of the input image which shall be filtered')
     group.add_option('-f', '--out_format', dest='of', default='GTiff', help='<string> File format of output image')
     group.add_option('-c', '--create_options', dest='co', help='<sequence of strings> Advanced raster creation options, such as band interleave. Example: -c "num_threads=all_cpus","tiled=yes"')
@@ -135,12 +153,16 @@ def run():
     out = options.img_out
     win = options.win
     # optional options
+    mode = options.mode
     band = options.band
     of = options.of
-    co = options.co.split(',')
+    try:
+        co = options.co.split(',')
+    except:
+        co = options.co
 
     # sort options to be able to parse them correctly even when user input is mixed up
-    opts = [img, out, win, band, of, co]
+    opts = [img, out, win, mode, band, of, co]
     index = 0
     for o in range(0,len(opts)):
         # find options not provided with their keyword
@@ -158,11 +180,11 @@ def run():
         exit(0)
     else:
         print 'Executing %s ...' % __file__
-        lowpass_filter(opts[0], opts[1], opts[2], opts[3], opts[4], opts[5])
+        lowpass_filter(opts[0], opts[1], opts[2], opts[3], opts[4], opts[5], opts[6])
         print 'Done!'
 
 # execute
 if __name__ == '__main__':
     start = time.time()
     run()
-print 'Duration (hh:mm:ss): \n %s' %(datetime.timedelta(seconds=time.time() - start))
+print '\nDuration (hh:mm:ss): %s' %(datetime.timedelta(seconds=time.time() - start))
