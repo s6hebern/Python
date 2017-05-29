@@ -14,37 +14,29 @@ def lowpass_filter(img_in, img_out, window, mode='mean', band=1, of='GTiff', co=
     """
     Apply a lowpass filter to an (integer) image.
 
-
     Use:
 
-    img_in (string): Input image (full path and file extension). May contain
+    :param string img_in: Input image (full path and file extension). May contain
             multiple bands.
-
-    img_out (string): the output image (full path and file extension).
-
-    window (integer): the size of the filter window. 3 means a filter size of
+    :param string img_out: the output image (full path and file extension).
+    :param integer window: the size of the filter window. 3 means a filter size of
             3x3, 5 means 5x5, etc.
             IMPORTANT NOTE: the output image will be smaller than the input
                 image! With a 3x3 filter, 1 pixel will be lost at EACH edge,
                 with a 5x5 filter, 2 pixels, etc.
-
-    mode (string): statistic to be used for filtering. One of:
+    :param string mode: (optional) statistic to be used for filtering. One of:
             - "mean"
             - "median"
             - "min"
             - "max"
             NAs are omitted in any case.
-
-    band (integer): the desired band of the input image which shall be filtered.
+    :param integer band: (optional) the desired band of the input image which shall be filtered.
             Counting starts at 1 (default).
-
-    of (string): the desired format of the output file as provided by the
+    :param string of: (optional) the desired format of the output file as provided by the
             GDAL raster formats (see: http://www.gdal.org/formats_list.html).
             Defaults to 'GTiFF'.
-
-    co (list): a list of strings, containing advanced raster creation
+    :param list co: (optional) a list of strings, containing advanced raster creation
             options such as band interleave.
-
             Example:
                 co=['interleave=bil','tiled=yes']
     """
