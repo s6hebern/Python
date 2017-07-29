@@ -17,12 +17,12 @@ lyr = shp.GetLayer()
 print 'applying changes...'
 field = 'FIELDNAME'
 for i in range(lyr.GetFeatureCount()):
-# get feature:
-feat = lyr.GetFeature(i)
-# change attributes:
-if feat.GetField(field) == 'OLD':
-feat.SetField(field, 'NEW')
-lyr.SetFeature(feat)
-feat = None
+    # get feature:
+    feat = lyr.GetFeature(i)
+    # change attributes:
+    if feat.GetField(field) == 'OLD':
+    feat.SetField(field, 'NEW')
+    lyr.SetFeature(feat)
+    feat = None
 print 'Done!'
 shp = None 
