@@ -105,7 +105,7 @@ Description:
         poly_xmax = x_min + self._hSpace
         poly_ymin = y_max
         poly_ymax = y_max - self._vSpace
-
+        # loop polygon creation
         colcount = 0
         while colcount < self._cols:
             colcount += 1
@@ -135,7 +135,6 @@ Description:
             poly_xmin = poly_xmin + self._hSpace
             poly_xmax = poly_xmax + self._hSpace
         ds.Destroy()
-
 
 # --------------------------------------------------------------------------- #
 # --------------------------------------------------------------------------- #
@@ -202,7 +201,6 @@ Description:
             cols = math.floor((extent[1] - extent[0]) / vspace)
             rows = math.floor((extent[3] - extent[2]) / hspace)
         return cols, rows
-
 
 # --------------------------------------------------------------------------- #
 # --------------------------------------------------------------------------- #
