@@ -1,4 +1,4 @@
-(Hopefully) useful scripts for geospatial data management and analysis.
+Basically my personal backup of scripts for geospatial data management and analysis, but free to everybody whom it might concern. 
 
 Languages: R and Python
 
