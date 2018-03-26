@@ -1,6 +1,6 @@
 import sys
 
-def query_yes_no(question, default="yes"):
+def askUser(question, default="yes"):
     """Ask a yes/no question via raw_input() and return the answer.
 
     :param string question: a string that is presented to the user.
@@ -12,7 +12,7 @@ def query_yes_no(question, default="yes"):
     :rtype: bool
 
     Example:\n
-    answer = query_yes_no('Are you sure?') \n
+    answer = askUser('Are you sure?') \n
     if answer is True:
         print 'I agree!'
     else:
@@ -40,4 +40,4 @@ def query_yes_no(question, default="yes"):
             sys.stdout.write("Please respond with 'yes' or 'no' "
                              "(or 'y' or 'n').\n")
 
-# print query_yes_no('Do you really want to proceed?', None)
+# print askUser('Do you really want to proceed?', None)
