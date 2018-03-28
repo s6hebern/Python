@@ -30,7 +30,7 @@ Description:
         group.add_option('-p', '--points', dest='points', type='str', help='Sampling points (vector format)')
         parser.add_option_group(group)
         group = OptionGroup(parser, 'Optional arguments', 'Can be defined')
-        group.add_option('-r', '--radius', dest='radius', type='int', default=1, help='Sampling radius')
+        group.add_option('-r', '--radius', dest='radius', type='int', default=0, help='Sampling radius')
         group.add_option('-m', '--mode', dest='mode', type='str', default='median', help='Statistic to use from within '
                                                                                          'sampling window. One of '
                                                                                          '(median, mean, min, max, '
@@ -160,8 +160,12 @@ Description:
                     xWin, yWin = (1, 1)
                 # read data
                 window = band.ReadAsArray(xOff, yOff, xWin, yWin)
-                window = window[window != no_data]
-                window = window[window != dt(self._dismiss)]
+                if len(window) > 1:
+                    window = window[window != no_data]
+                    window = window[window != dt(self._dismiss)]
+                else:
+                    if window.flatten()[0] == self._dismiss or window.flatten()[0] == no_data:
+                        window = np.array([])
                 # calculate statistic
                 data = self._calculateStats(window, self._mode, no_data)
                 # set attribute
