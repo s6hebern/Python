@@ -65,7 +65,6 @@ Description:
             parser.print_help()
             print 'No sampling points!'
             sys.exit(1)
-        self._output = options.output
         self._radius = int(options.radius)
         self._mode = options.mode
         if options.bands:
@@ -91,8 +90,8 @@ Description:
         return True
 
     def run(self):
+        start = time.time()
         warnings.simplefilter('ignore', FutureWarning)
-        # np.warnings.filterwarnings('ignore', FutureWarning)
         self.checkOptions()
         print 'Checking spatial references...'
         self._points, self._image = self._matchProjection(self._points, self._image, match=self._crs)
@@ -176,6 +175,7 @@ Description:
         ds_img = None
         if self._temp:
             os.remove(self._temp)
+        print '\nDuration (hh:mm:ss): \t %s' % (datetime.timedelta(seconds=time.time() - start))
         return True
 
     # ----------------------------------------------------------------------- #
@@ -249,8 +249,5 @@ Description:
 # --------------------------------------------------------------------------- #
 # run
 if __name__ == '__main__':
-    start = time.time()
     app = pointSampling(sys.argv)
     app.run()
-    print 'Duration (hh:mm:ss): \t %s' % (datetime.timedelta(seconds=time.time() - start))
-
