@@ -1,11 +1,11 @@
-def hex_to_RGB(hex_code):
+def hex2RGB(hex_code):
     """
     Convert hex-color to RGB
 
     :param str hex_code: Color as hex-code including hash sign (e.g. '#FFFFFF')
     :return: Tuple of integers for RGB
     :rtype: tuple
-    :example: hex_to_RGB('#FFFFFF') --> [255,255,255]
+    :example: hex2RGB('#FFFFFF') --> [255,255,255]
     """
 
     # Pass 16 to the integer function for change of base
@@ -13,7 +13,7 @@ def hex_to_RGB(hex_code):
     return tuple(rgb_list)
 
 
-def linear_gradient(start_hex, end_hex, n):
+def linearColorGradient(start_hex, end_hex, n):
     """
     Returns a gradient list of (n) colors between two hex colors. start_hex and end_hex should be the full six-digit
     color string, including the hash sign ('#FFFFFF').
@@ -27,8 +27,8 @@ def linear_gradient(start_hex, end_hex, n):
 
     if n < 2:
         raise ValueError('Parameter "n" has to be at least 2!')
-    s = hex_to_RGB(start_hex)
-    f = hex_to_RGB(end_hex)
+    s = hex2RGB(start_hex)
+    f = hex2RGB(end_hex)
     print 'First color: \n\t HEX: {hexcol} \t RGB: {rgbcol}'.format(hexcol=start_hex, rgbcol=s)
     print 'Last color: \n\t HEX: {hexcol} \t RGB: {rgbcol}'.format(hexcol=end_hex, rgbcol=f)
     # Initialize a list of the output colors with the starting color
@@ -45,4 +45,4 @@ def linear_gradient(start_hex, end_hex, n):
 if __name__ == '__main__':
     start = '#7d7d7d'.upper()
     end = '#be8c14'.upper()
-    print linear_gradient(start, end, n=5)
+    print linearColorGradient(start, end, n=5)
