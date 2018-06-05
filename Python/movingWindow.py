@@ -48,7 +48,6 @@ def movingWindow(array, window, fun, args, module=None, package=None):
             exp = string.join(
                 [exp, 'inData[', str(i), ':rows-', str(rev[i]), ', ', str(rev[j]), ':cols-', str(j), '], '], sep='')
     exp = string.join([exp[:-2], '], {args})'.format(args=args)], sep='')
-    print exp
     # ----------------------------------------------------------------------- #
     # for a window of 3x3 for a filter, exp would look like this:
     # outData[1:rows-1,1:cols-1] = np.nanmean(inData[0:rows-2, 0:cols-2] + \
