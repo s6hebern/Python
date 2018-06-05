@@ -13,7 +13,7 @@ def movingWindow(array, window, fun, args):
     :param str args: additional arguments to be passed to function, e.g. axis=0
     :return: array
     :rtype: array
-        :example:
+    :example:
     image = np.array([[0, 0, 1, 1, 1, 0],
                         [0, 0, 1, 1, 2, 3], \n
                         [0, 2, 2, 2, 4, 1], \n
