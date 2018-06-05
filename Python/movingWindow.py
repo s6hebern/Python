@@ -1,8 +1,9 @@
 import string
 import numpy as np
+import importlib
 
 
-def movingWindow(array, window, fun, args):
+def movingWindow(array, window, fun, args, module=None, package=None):
     """
     Apply a function using a moving window. The array will be expanded by duplicating the outer pixels, so the output
     array will have the same size as the input array.
@@ -11,6 +12,8 @@ def movingWindow(array, window, fun, args):
     :param int window: window size for array slices. Must be odd!
     :param str fun: Function to apply, e.g. 'numpy.nanmean'
     :param str args: additional arguments to be passed to function, e.g. axis=0
+    :param str module: Python module from which to take 'fun' (as used with 'importlib')
+    :param str package: Python package from which to take 'fun' (as used with 'importlib')
     :return: array
     :rtype: array
     :example:
@@ -20,9 +23,13 @@ def movingWindow(array, window, fun, args):
                         [2, 2, 3, 3, 0, 0], \n
                         [1, 2, 2, 0, 0, 4], \n
                         [1, 2, 0, 0, 0, 3]], dtype=np.uint8)
-    out = movingWindow(image, 2, 'np.nanmean', 'axis=0')
+    out = movingWindow(image, 2, 'nanmean', 'axis=0', module='numpy)
     """
 
+    if module:
+        mod = importlib.import_module(module, package=package)
+    if len(array.shape) != 2:
+        raise ValueError('Input array must be 2-dimensional!')
     if window % 2 == 0:
         raise ValueError('Window size must be odd!')
     rows = array.shape[0]
@@ -35,12 +42,13 @@ def movingWindow(array, window, fun, args):
         inData = np.insert(inData, -1, inData[:, -1], axis=1) # right
         inData = np.insert(inData, 0, inData[0, :], axis=0)  # top
         inData = np.insert(inData, -1, inData[-1, :], axis=0)  # bottom
-    exp = string.join([fun, '(['], sep='')
+    exp = string.join(['mod.', fun, '(['], sep='')
     for i in range(window):
         for j in rev:
             exp = string.join(
                 [exp, 'inData[', str(i), ':rows-', str(rev[i]), ', ', str(rev[j]), ':cols-', str(j), '], '], sep='')
     exp = string.join([exp[:-2], '], {args})'.format(args=args)], sep='')
+    print exp
     # ----------------------------------------------------------------------- #
     # for a window of 3x3 for a filter, exp would look like this:
     # outData[1:rows-1,1:cols-1] = np.nanmean(inData[0:rows-2, 0:cols-2] + \
