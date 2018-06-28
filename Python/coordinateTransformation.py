@@ -11,6 +11,7 @@ def projectCoordsWkt(x, y, wkt_in, wkt_out):
     :param str wkt_in: WKT-representation of input SRS
     :param str wkt_out: WKT-representation of output SRS
     :return: transformed coordinates (x, y)
+    :rtype: tuple
     """
 
     src_sr = osr.SpatialReference()
@@ -32,7 +33,8 @@ def projectCoordsEPSG(x, y, epsg_in, epsg_out):
     :param int/float y: y-coordinate
     :param epsg_in: EPSG-code of input SRS
     :param epsg_out: EPSG-code of output SRS
-    :return:
+    :return: transformed coordinates (x, y)
+    :rtype: tuple
     """
 
     src_sr = osr.SpatialReference()
@@ -55,6 +57,7 @@ def geoToPixelCoords(x, y, geotrans):
     :param tuple geotrans: GeoTransformObject from gdalDataSource or tuple with (xMin, cellWidth, xRotation, yMax,
                             yRotation, cellHeight). cellHeight has to be nagtive!
     :return: Column and row at given position (col, row)
+    :rtype: tuple
     """
 
     ulx = geotrans[0]
@@ -75,6 +78,7 @@ def pixelToGeoCoords(col, row, geotrans, loc='center'):
                             yRotation, cellHeight). cellHeight has to be nagtive!
     :param str loc: location within the pixel. One of "center", "ul", "ur", "ll", "lr"
     :return: Coordinates at given grid cell (x, y)
+    :rtype: tuple
     """
 
     ulx = geotrans[0]
@@ -102,3 +106,34 @@ def pixelToGeoCoords(col, row, geotrans, loc='center'):
     else:
         raise ValueError('loc only takes one of "center", "ul", "ur", "ll", "lr"!')
     return xgeo, ygeo
+
+
+def DD2DMS(dd):
+    """
+    Convert decimal degrees to degrees minutes seconds
+
+    :param float dd: Coordinate represented as decimal degree (like 49.854276). Use negative values for South/West.
+    :return: Coordinate represented as degrees minutes seconds
+    :rtype: tuple
+    """
+
+    mnt, sec = divmod(dd * 3600, 60)
+    deg, mnt = divmod(mnt, 60)
+    return deg, mnt, sec
+
+
+def DMS2DD(dms):
+    """
+    Convert degrees minutes seconds to decimal degrees
+
+    :param tuple dms: Coordinate represented as tuple of length 3 (like (49.0, 51.0, 15.3936). Use negative values of
+        degrees for South/West.
+    :return: Coordinate represented as decimal degrees
+    :rtype: float
+    """
+
+    if len(dms) != 3:
+        raise ValueError('Coordinate tuple has have exactly 3 elements (degrees, minutes, seconds)!')
+    deg, mnt, sec = dms
+    dd = float(deg) + mnt/60. + sec/(60*60)
+    return dd
