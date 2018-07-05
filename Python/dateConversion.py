@@ -62,17 +62,19 @@ def doy2date(year, doy, asType='date', sep='-'):
     :param int doy: numbered day of the year (counting starts at 1)
     :param str sep: Year-Month-Day separator for output string
     :return: Date, either as datetime-format (default) or string with the given separator for Year-Month-Day
+    rtype datetime/str
     """
-
     date = datetime.datetime.strptime(str(year) + str(doy), '%Y%j')
-    if asType == 'str':
+    if asType.lower() == 'str':
         year = str(date.year)
         month = str(date.month)
         day = str(date.day)
         datestr = string.join([year, month, day], sep=sep)
         return datestr
-    elif asType == 'date':
+    elif asType.lower() == 'date':
         return date
+    else:
+        raise ValueError('Wrong value for "asType". Has to be either "str" or "date"!')
 
 
 def date2doy(date, sep='-'):
@@ -82,8 +84,8 @@ def date2doy(date, sep='-'):
     :param str date:
     :param str sep:
     :return: tuple of year and Day-of-Year (year, doy)
+    :rtype: tuple
     """
-
     year = int(date.split(sep)[0])
     month = int(date.split(sep)[1])
     day = int(date.split(sep)[2])
@@ -95,9 +97,10 @@ def dayRange(start, end):
     """
     Create a range of dates as datetime objects.
 
-    :param start: datetime object of start date
-    :param end: datetime object of end date
+    :param datetime start: start date
+    :param datetime end: end date
     :return: range of datetime objects with timedelta = 1 day
+    :rtype: range
     :example:
     for single_date in self.dayRange(start, end):
         year = single_date.year \n
@@ -112,9 +115,10 @@ def monthRange(start, end):
     """
     Create a range of dates as datetime objects.
 
-    :param start: datetime object of start date
-    :param end: datetime object of end date
+    :param datetime start: start date
+    :param datetime end: end date
     :return: range of datetime objects with timedelta = 1 month
+    :rtype: range
     :example:
     for single_date in self.monthRange(start, end):
         year = single_date.year \n
@@ -133,6 +137,7 @@ def datestring2date(datestring, date_format):
     :param str datestring: date in string format
     :param str date_format: string formatting to indicate date format
     :return: datetime object
+    :rtype: datetime
     :example: datestring2date('2017-12-06', '%Y-%m-%d')
     """
     date = datetime.datetime.strptime(datestring, date_format)
@@ -146,6 +151,7 @@ def date2datestring(date, date_format):
     :param datetime date: date as datetime object
     :param str date_format: string formatting to indicate date format
     :return: date as string
+    :rtype: str
     :example: date2datestring(datetime.datetime.now(), '%Y-%m-%d')
     """
     datestring = datetime.datetime.strftime(date, date_format)
