@@ -1,9 +1,58 @@
 # -*- coding: utf-8 -*-
 
-import os
 import datetime
 import string
 from dateutil.relativedelta import relativedelta
+from dateutil import tz
+
+
+def local2UTC(dt, timezone=None):
+    """
+    Convert local time to UTC
+
+    :param datetime dt:
+    :param str timezone: local timezone (None for auto detection).
+        Check https://en.wikipedia.org/wiki/List_of_tz_database_time_zones for valid options.
+    :return: time in local timezone
+    :rtype datetime
+    """
+    utc_zone = tz.gettz('UTC')
+    if timezone:
+        try:
+            local_zone = tz.gettz(timezone)
+        except:
+            print 'Invalid timezone indication! Using auto-detection instead!'
+            local_zone = tz.tzlocal()
+    else:
+        local_zone = tz.tzlocal()
+    dt = dt.replace(tzinfo=local_zone)
+    print 'Converting {z} to UTC'.format(z=local_zone._filename)
+    return dt.astimezone(utc_zone)
+
+
+def UTC2local(dt, timezone=None):
+    """
+    Convert UTC time to local time
+
+    :param datetime dt:
+    :param str timezone: local timezone (None for auto detection).
+        Check https://en.wikipedia.org/wiki/List_of_tz_database_time_zones for valid options.
+    :return: time in local timezone
+    :rtype datetime
+    """
+    utc_zone = tz.gettz('UTC')
+    if timezone:
+        try:
+            local_zone = tz.gettz(timezone)
+        except:
+            print 'Invalid timezone indication! Using auto-detection instead!'
+            local_zone = tz.tzlocal()
+    else:
+        local_zone = tz.tzlocal()
+    dt = dt.replace(tzinfo=utc_zone)
+    print 'Converting from UTC to {z}'.format(z=local_zone._filename)
+    return dt.astimezone(local_zone)
+
 
 def doy2date(year, doy, asType='date', sep='-'):
     """
@@ -24,6 +73,7 @@ def doy2date(year, doy, asType='date', sep='-'):
         return datestr
     elif asType == 'date':
         return date
+
 
 def date2doy(date, sep='-'):
     """
@@ -57,6 +107,7 @@ def dayRange(start, end):
     for n in range(int((end - start).days)):
         yield start + datetime.timedelta(days=n)
 
+
 def monthRange(start, end):
     """
     Create a range of dates as datetime objects.
@@ -74,6 +125,7 @@ def monthRange(start, end):
         yield current
         current += relativedelta(months=1)
 
+
 def datestring2date(datestring, date_format):
     """
     Convert dates stored as strings to datetime objects
@@ -85,6 +137,7 @@ def datestring2date(datestring, date_format):
     """
     date = datetime.datetime.strptime(datestring, date_format)
     return date
+
 
 def date2datestring(date, date_format):
     """
