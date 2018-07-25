@@ -16,6 +16,7 @@ def local2UTC(dt, timezone=None):
     :return: time in local timezone
     :rtype datetime
     """
+    
     utc_zone = tz.gettz('UTC')
     if timezone:
         try:
@@ -40,6 +41,7 @@ def UTC2local(dt, timezone=None):
     :return: time in local timezone
     :rtype datetime
     """
+    
     utc_zone = tz.gettz('UTC')
     if timezone:
         try:
@@ -62,8 +64,9 @@ def doy2date(year, doy, asType='date', sep='-'):
     :param int doy: numbered day of the year (counting starts at 1)
     :param str sep: Year-Month-Day separator for output string
     :return: Date, either as datetime-format (default) or string with the given separator for Year-Month-Day
-    rtype datetime/str
+    :rtype datetime/str
     """
+    
     date = datetime.datetime.strptime(str(year) + str(doy), '%Y%j')
     if asType.lower() == 'str':
         year = str(date.year)
@@ -81,11 +84,12 @@ def date2doy(date, sep='-'):
     """
     Convert string of date to tuple of year and Day-of-Year
 
-    :param str date:
-    :param str sep:
+    :param str date: date as string
+    :param str sep: separator
     :return: tuple of year and Day-of-Year (year, doy)
     :rtype: tuple
     """
+    
     year = int(date.split(sep)[0])
     month = int(date.split(sep)[1])
     day = int(date.split(sep)[2])
@@ -107,6 +111,7 @@ def dayRange(start, end):
         month = single_date.month \n
         day = single_date.day
     """
+    
     for n in range(int((end - start).days)):
         yield start + datetime.timedelta(days=n)
 
@@ -124,6 +129,7 @@ def monthRange(start, end):
         year = single_date.year \n
         month = single_date.month \n
     """
+    
     current = start
     while current <= end:
         yield current
@@ -140,6 +146,7 @@ def datestring2date(datestring, date_format):
     :rtype: datetime
     :example: datestring2date('2017-12-06', '%Y-%m-%d')
     """
+    
     date = datetime.datetime.strptime(datestring, date_format)
     return date
 
@@ -154,5 +161,6 @@ def date2datestring(date, date_format):
     :rtype: str
     :example: date2datestring(datetime.datetime.now(), '%Y-%m-%d')
     """
+    
     datestring = datetime.datetime.strftime(date, date_format)
     return datestring
