@@ -19,8 +19,6 @@ def s3netcdf2other(input_dir, output_image, outformat='GTiff'):
     ds_nc = Dataset(nc_coords, 'r')
     coords = (ds_nc.variables['latitude'], ds_nc.variables['longitude'])
     for v, var in enumerate(coords):
-        rows = var.shape[0]
-        cols = var.shape[1]
         nodata = var._FillValue
         scale = var.scale_factor
         var_vrt = os.path.join(tempdir, var.name + '.vrt')
@@ -47,7 +45,6 @@ def s3netcdf2other(input_dir, output_image, outformat='GTiff'):
         # write to temporary tif
         cmd = ['gdal_translate', '-unscale', var_vrt, var_tif]
         sub.call(cmd)
-        ds = None
     ds_nc.close()
     lat_tif = os.path.join(tempdir, 'latitude.tif')
     lon_tif = os.path.join(tempdir, 'longitude.tif')
@@ -125,7 +122,7 @@ def s3netcdf2other(input_dir, output_image, outformat='GTiff'):
         # convert to tif
         cmd = ['gdalwarp', '-overwrite', '-t_srs', 'epsg:4326', '-geoloc', out_vrt, out_tif]
         sub.call(cmd)
-        # remove temp files safely
+        # remove temp files safely (somehow, Windows does not release the file correctly)
         os.remove(out_vrt)
         ds = gdal.Open(data_vrt_tif, gdal.GA_ReadOnly)
         ds = None
