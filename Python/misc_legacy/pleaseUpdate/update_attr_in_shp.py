@@ -21,7 +21,7 @@ for i in range(lyr.GetFeatureCount()):
     feat = lyr.GetFeature(i)
     # change attributes:
     if feat.GetField(field) == 'OLD':
-    feat.SetField(field, 'NEW')
+        feat.SetField(field, 'NEW')
     lyr.SetFeature(feat)
     feat = None
 print 'Done!'
