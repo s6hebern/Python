@@ -1,5 +1,9 @@
 import os
 import fnmatch
+import operator
+import string
+import win32com.client as com
+from tqdm import tqdm
 
 
 def list_files(path, pattern=None, full=True, recurse=True, ignore=None):
@@ -121,3 +125,37 @@ def list_dirs(path, pattern=None, full=True, recurse=True, ignore=None):
                     else:
                         dirlist.append(f)
     return dirlist
+
+
+def get_folder_size(path, sort_by='size', print_out=True):
+    # type: (str, str, bool) -> dict
+    """
+    Retrieve folder sizes from Windows filesystem
+
+    :param path: Parent directory
+    :param sort_by: Sorting policy. If not 'size', the list will be sorted alphabetically
+    :param print_out: Print results
+    :return: Dictionary with folder names as keys and their respective size as values
+    """
+    MB = 1024. * 1024
+    GB = MB * 1024
+    folder_dict = {}
+    print('\nCollecting statistics for folders in {p} ...'.format(p=path))
+    folderlist = os.listdir(path)
+    for f in tqdm(folderlist, desc='Progress'):
+        f_path = os.path.join(path, f)
+        if os.path.isdir(f_path):
+            fso = com.Dispatch('Scripting.FileSystemObject')
+            folder = fso.GetFolder(f_path)
+            folder_dict[f] = folder.Size / GB
+    print('\n')
+    if sort_by.lower() == 'size':
+        sorted_by = sorted(folder_dict.items(), key=operator.itemgetter(1))
+    else:
+        sorted_by = sorted(folder_dict.items(), key=operator.itemgetter(0))
+    if print_out:
+        for folder, size in sorted_by:
+            print(string.join([folder, '\t\t', str(round(size, 2)), 'GB']))
+    print('\nTotal number of folders: {n}'.format(n=len(folder_dict.keys())))
+    print('Total size: {x} \t GB'.format(x=round(sum(folder_dict.values()), 2)))
+    return folder_dict
