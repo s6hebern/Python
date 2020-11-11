@@ -10,7 +10,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import scale
 from skimage.morphology import disk
 from skimage.filters import rank
-from basic_functions.callCmd import callCmd
+from basic_functions.call_cmd import run_cmd
 
 
 """
@@ -379,7 +379,7 @@ def apply_mask(image, mask, outfile, bands=None, of='GTiff', co=None, no_data=0,
         cmd = ['gdalwarp', '-of', 'GTiff', '-t_srs', 'epsg:{e}'.format(e=epsg_img), '-te',
                str(xmin), str(ymin), str(xmax), str(ymax)]
         cmd += ['-tr',  str(xres), str(yres), mask, temp]
-        callCmd(cmd)
+        run_cmd(cmd)
         mask = temp
     ds_mask = gdal.Open(mask, gdal.GA_ReadOnly)
     if (ds_img.RasterXSize, ds_img.RasterYSize) != (ds_mask.RasterXSize, ds_mask.RasterYSize):
