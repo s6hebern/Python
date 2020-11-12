@@ -10,8 +10,8 @@ def installModuleArcpy(module):
         :example: installModulArcpy('some_module')
     """
 
-    import os, ctypes, subprocess
-    import arcpy
+    import ctypes, subprocess
+    from eomap import arcpy
 
     try:
         import module
@@ -53,7 +53,7 @@ def installModuleStandard(module):
         :example: installModulStandard('some_module')
     """
 
-    import os, ctypes, subprocess
+    import ctypes, subprocess
 
     try:
         import module
