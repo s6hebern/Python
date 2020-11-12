@@ -11,7 +11,7 @@ def installModuleArcpy(module):
     """
 
     import ctypes, subprocess
-    from eomap import arcpy
+    from eomap_tools import arcpy
 
     try:
         import module
