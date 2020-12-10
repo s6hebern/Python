@@ -3,14 +3,17 @@ import sys
 import warnings
 import numpy as np
 import skimage.io as io
-import subprocess as sub
+
 from tqdm import tqdm
-from osgeo import gdal, gdalconst, gdal_array, osr
+from osgeo import gdal, gdalconst, gdal_array, osr, ogr
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import scale
 from skimage.morphology import disk
 from skimage.filters import rank
+from skimage.segmentation import felzenszwalb
+
 from basic_functions.call_cmd import run_cmd
+import vector_tools
 
 
 """
@@ -21,13 +24,14 @@ Geotransform definition: (x_min, pixel_size, 0, y_max, 0, -pixel_size)
 """
 
 
-def get_raster_properties(ds_name):
-    # type: (str) -> (int, int, int, gdal.Band.DataType, str, tuple)
+def get_raster_properties(ds_name, dictionary=False):
+    # type: (str, bool) -> (int, int, int, int, str, tuple) or dict
     """
     Extract the typical raster properties columns, rows, number of bands, data type (GDAL type),
     projection and geotransform object.
 
     :param ds_name: Input raster
+    :param dictionary: Return raster properties as dictionary with the keys ('cols', 'rows', 'bandnum', 'dtype', 'proj', 'geotrans')
     :return: Raster properties (cols, rows, bandnum, dtype, proj, geotrans)
     """
     ds = gdal.Open(ds_name, gdal.GA_ReadOnly)
@@ -38,7 +42,10 @@ def get_raster_properties(ds_name):
     proj = ds.GetProjection()
     geotrans = ds.GetGeoTransform()
     ds = None
-    return cols, rows, bandnum, dtype, proj, geotrans
+    props = (cols, rows, bandnum, dtype, proj, geotrans)
+    if dictionary:
+        props = {key: value for (key, value) in zip(('cols', 'rows', 'bandnum', 'dtype', 'proj', 'geotrans'), props)}
+    return props
 
 
 def create_ds(ds_name, cols, rows, bands, dtype, of='GTiff', co=None, overwrite=True):
@@ -86,6 +93,25 @@ def delete_ds(ds_name):
     return
 
 
+def convert_numpy_type_to_gdal_type(array):
+    typemap = {}
+    for name in dir(np):
+        obj = getattr(np, name)
+        if hasattr(obj, 'dtype'):
+            try:
+                npn = obj(0)
+                nat = np.asscalar(npn)
+                if gdal_array.NumericTypeCodeToGDALTypeCode(npn.dtype.type):
+                    typemap[npn.dtype.name] = gdal_array.NumericTypeCodeToGDALTypeCode(npn.dtype.type)
+            except:
+                pass
+    typemap['int64'] = 7
+    try:
+        return typemap[array.dtype.name]
+    except KeyError:
+        raise KeyError('Unsupported or undetectable data type!')
+
+
 def export_image(output, array, reference, of='GTiff', co=None):
     # type: (str, np.array, str, str, list) -> None
     """
@@ -104,7 +130,10 @@ def export_image(output, array, reference, of='GTiff', co=None):
     ds = gdal.Open(reference, gdal.GA_ReadOnly)
     proj = ds.GetProjection()
     geotrans = ds.GetGeoTransform()
-    drv = ds.GetDriver()
+    if not of:
+        drv = ds.GetDriver()
+    else:
+        drv = gdal.GetDriverByName(of)
     ds = None
     if len(array.shape) == 2:
         rows, cols = array.shape
@@ -113,7 +142,8 @@ def export_image(output, array, reference, of='GTiff', co=None):
         rows, cols, bands = array.shape
     if os.path.exists(output):
         os.remove(output)
-    dtype = gdal_array.NumericTypeCodeToGDALTypeCode(array.dtype)
+    # dtype = gdal_array.NumericTypeCodeToGDALTypeCode(array.dtype)
+    dtype= convert_numpy_type_to_gdal_type(array)
     if not co:
         ds = drv.Create(output, cols, rows, bands, dtype)
     else:
@@ -339,6 +369,106 @@ def stack_images(images, outfile, of='GTiff', co=None, no_data=0, overwrite=Fals
         ds = None
     ds_out = None
     print('Done!')
+    return
+
+
+def spectral_subset(image, bands, output, of='GTiff', co=None, no_data=None, band_names=None, overwrite=False):
+    # type: (str, list or tuple, str, str, list, int or float, list, bool) -> None
+    """
+    Create a spectral subset of a multiband image.
+
+    :param image: Input image
+    :param bands: List of integers of the desired band numbers to keep. Counting starts at 1.
+    :param output: Output file
+    :param of: The desired format of the output file as provided by the GDAL raster formats
+            (see: http://www.gdal.org/formats_list.html).
+    :param co: Advanced raster creation options such as band interleave or compression. <br>
+            Example: co=['compress=lzw']
+    :param no_data: NoData-value, given as int or float (depending on the data type of the images).
+            Defaults to the NoData-value of the first input image.
+    :param band_names: List of band names for the output file. Defaults to the names of the input files.
+    :param overwrite: Overwrite output file in case it already exists.
+    """
+    bands = bands.split(',')
+    try:
+        bands = [int(b) for b in bands]
+    except ValueError:
+        print('Band list contains non-integer charaters or a different separator than ","!')
+        sys.exit(1)
+    ds = gdal.Open(image, gdal.GA_ReadOnly)
+    if no_data is None:
+        no_data = ds.GetRasterBand(1).GetNoDataValue()
+    dtype = ds.GetRasterBand(1).DataType
+    ds_props = get_raster_properties(image, dictionary=True)
+    ds_out = create_ds(output, ds_props['cols'], ds_props['rows'], len(bands), dtype, of, co, overwrite)
+    ds_out.SetProjection(ds_props['proj'])
+    ds_out.SetGeoTransform(ds_props['geotrans'])
+    meta = {}
+    for b in tqdm(xrange(1, len(bands) + 1), desc='Progress'):
+        band = ds.GetRasterBand(int(bands[b-1]))
+        band_out = ds_out.GetRasterBand(b)
+        band_out.WriteRaster(band.ReadRaster())
+        if not band_names:
+            name = '_'.join(['Band', str(bands[b-1])])
+            meta[name] = band.GetDescription()
+            band_out.SetDescription(band.GetDescription())
+        else:
+            name = '_'.join(['Band', str(band_names[b-1])])
+            meta[name] = band_names[b]
+            band_out.SetDescription(band_names[b-1])
+        band_out.SetNoDataValue(no_data)
+        band = None
+    ds_out.SetMetadata(meta)
+    ds_out = None
+    ds = None
+    print('Done!')
+    return
+
+
+def multi_to_single(image, output=None, of='GTiff', co=None, no_data=None, overwrite=False):
+    """
+    Split a multiband image into many singleband images.
+
+    :param image: Input image
+    :param output: Output file. The band number will be appended at the end ('*_X.*'). Defaults to the file name of the
+            input image.
+    :param of: The desired format of the output file as provided by the GDAL raster formats
+            (see: http://www.gdal.org/formats_list.html).
+    :param co: Advanced raster creation options such as band interleave or compression. <br>
+            Example: co=['compress=lzw']
+    :param no_data: NoData-value, given as int or float (depending on the data type of the images).
+            Defaults to the NoData-value of the first input image.
+    :param overwrite: Overwrite output file in case it already exists.
+    """
+    ds = gdal.Open(image, gdal.GA_ReadOnly)
+    ds_props = get_raster_properties(image, dictionary=True)
+    bandnum = ds.RasterCount
+    for b in tqdm(xrange(1, ds_props['bandnum'] + 1), desc='Progress'):
+        band = ds.GetRasterBand(b)
+        if no_data is None:
+            no_data = band.GetNoDataValue()
+        if output:
+            out_name = ''.join([os.path.splitext(output)[0], '_', str(b).zfill(len(bandnum)),
+                                os.path.splitext(output)[1]])
+        else:
+            out_name = ''.join([os.path.splitext(image)[0], '_', str(b).zfill(len(bandnum)),
+                                os.path.splitext(image)[1]])
+        ds_out = create_ds(out_name, ds_props['cols'], ds_props['rows'], 1, band.DataType, of, co, overwrite)
+        ds_out.SetProjection(ds_props['proj'])
+        ds_out.SetGeoTransform(ds_props['geotrans'])
+        band_out = ds_out.GetRasterBand(1)
+        band_out.WriteArray(band.ReadRaster())
+        meta = {}
+        name = '_'.join(['Band', str(b)])
+        meta[name] = band.GetDescription()
+        band_out.SetDescription(band.GetDescription())
+        band_out.SetNoDataValue(no_data)
+        band_out.WriteRaster()
+        ds_out.SetMetadata(meta)
+        band = None
+        band_out = None
+        ds_out = None
+    ds = None
     return
 
 
@@ -600,19 +730,19 @@ def local_hist_equalization(image, radius, output):
     return
 
 
-def calculate_pc(ds_name, export=None, co=None):
+def calculate_pc(image, export=None, co=None):
     # type: (str, str, list) -> np.array
     """
     Perform a principal components transformation on an input image.
 
-    :param ds_name: Path to input image.
+    :param image: Path to input image.
     :param export: Path to output image, default is None (image will not be saved)
     :param co: Advanced raster creation options such as band interleave or compression. <br<>
             Example: co=['compress=lzw']
     :return: Principal Components of the input image.
     """
     print('Retrieving principal components...')
-    img_ds = io.imread(ds_name)
+    img_ds = io.imread(image)
     img = np.array(img_ds, dtype='float64')
     if True in np.isnan(img) or True in np.isinf(img):
         warnings.warn('NaN or Inf detected! Converting to 0 and large number internally!!')
@@ -624,7 +754,7 @@ def calculate_pc(ds_name, export=None, co=None):
     # transform back
     pc = img_pc.reshape(img.shape)
     if export:
-        export_image(export, pc, ds_name, co=co)
+        export_image(export, pc, image, co=co)
     print('Done!')
     return pc
 
@@ -651,24 +781,24 @@ def stretch_greyvalues(array, newmin=0, newmax=255):
     return array
 
 
-def match_rasters(reference, warp, output, of='GTiff', co=None, overwrite=True):
+def match_rasters(reference, warp, outfile, of='GTiff', co=None, overwrite=True):
     # type: (str, str, str, str, list, bool) -> object
     """
     Map a raster to the projection, extent and resolution of a reference raster
 
-    :param reference: Path to reference image that holds the target projection and extent
-    :param warp: Path to the image to be mapped to the reference image
-    :param output: Path to the output image
+    :param reference: Reference image that holds the target projection and extent
+    :param warp: image to be mapped to the reference image
+    :param outfile: Output image
     :param of: Output format as defined at http://www.gdal.org/formats_list.html
     :param co: Advanced raster creation options such as band interleave or compression. <br<>
             Example: co=['compress=lzw']
     :param overwrite: Overwrite output file if it already exists
     :return: --
     """
-    if os.path.exists(output) and overwrite is True:
-        delete_ds(output)
-    elif os.path.exists(output) and overwrite is False:
-        raise IOError('File {f} already exists! To overwrite, use "overwrite=True"!'.format(f=output))
+    if os.path.exists(outfile) and overwrite is True:
+        delete_ds(outfile)
+    elif os.path.exists(outfile) and overwrite is False:
+        raise IOError('File {f} already exists! To overwrite, use "overwrite=True"!'.format(f=outfile))
     # read reference raster
     print('Reading reference raster {f}'.format(f=reference))
     ref_ds = gdal.Open(reference, gdal.GA_ReadOnly)
@@ -685,13 +815,188 @@ def match_rasters(reference, warp, output, of='GTiff', co=None, overwrite=True):
     warp_dtype = warp_ds.GetRasterBand(1).DataType
     # create output file
     drv = gdal.GetDriverByName(of)
-    out_ds = create_ds(output, ref_cols, ref_rows, warp_band_num, warp_dtype, of, co, overwrite)
+    out_ds = create_ds(outfile, ref_cols, ref_rows, warp_band_num, warp_dtype, of, co, overwrite)
     out_ds.SetGeoTransform(ref_geotrans)
     out_ds.SetProjection(ref_proj)
     # project raster
-    print('Matching rasters and writing output to {f}'.format(f=output))
+    print('Matching rasters and writing output to {f}'.format(f=outfile))
     gdal.ReprojectImage(warp_ds, out_ds, warp_proj, ref_proj, gdalconst.GRA_NearestNeighbour)
     warp_ds = None
     out_ds = None
     print('Done!')
     return True
+
+
+def image_segmentation(image, scale_param=10, min_area=9, max_area=None, output=None, of='ESRI Shapefile', overwrite=True):
+    # type: (str, int, int, int, str, str, bool) -> np.array
+    """
+    Use the Felsenszwalb algorithm for image segmentation. \n
+    Original publication here: http://vision.stanford.edu/teaching/cs231b_spring1415/papers/IJCV2004_FelzenszwalbHuttenlocher.pdf \n
+    Implementation here: https://scikit-image.org/docs/0.14.x/api/skimage.segmentation.html#skimage.segmentation.felzenszwalb
+
+    :param image: Input image
+    :param scale_param: The number of produced segments as well as their size can only be controlled indirectly through this
+            parameter. Higher values result in larger clusters.
+    :param min_area: Minimum segment size (in pixels)
+    :param max_area: Maximum segment size (in pixels)
+    :param output: Output name in case segments shall be exported
+    :param of: Output format according to OGR driver standard
+    :param overwrite: Overwrite output file, if it already exists
+    :return:
+    """
+    img = io.imread(image)
+    # img = exposure.equalize_hist(image)
+    if get_raster_properties(image, dictionary=True)['bandnum'] > 1:
+        segments = felzenszwalb(img, multichannel=True, scale=scale_param, min_size=min_area)
+    else:
+        segments = felzenszwalb(img, multichannel=False, scale=scale_param, min_size=min_area)
+    if max_area:
+        segments = remove_large_areas(segments, max_area)
+    if output:
+        from basic_functions.vector_tools import create_ds, close_rings
+        temp = output.replace(os.path.splitext(output)[-1], '__TEMP.tif')
+        export_image(temp, segments, image)
+        ds = gdal.Open(temp)
+        data_band = ds.GetRasterBand(1)
+        sr = osr.SpatialReference()
+        sr.ImportFromEPSG(get_epsg(image))
+        out_ds, out_lyr = create_ds(output, of, ogr.wkbPolygon, sr, overwrite)
+        gdal.Polygonize(data_band, None, out_lyr, -1, [], callback=None)
+        out_lyr = None
+        out_ds = None
+        ds = None
+        close_rings(output)
+    return segments
+
+
+def remove_large_areas(array, max_size):
+    # type: (np.array, int) -> np.array
+    """
+    Remove areas above a given size from the input segment array. Size referes to number of pixels.
+
+    :param array: segment array
+    :param max_size: maximum segment size
+    :return: input array, with areas larger than max_size removed
+    """
+    out = np.copy(array)
+    sizes = np.bincount(array.ravel())
+    too_big = sizes > max_size
+    too_big_mask = too_big[array]
+    out[too_big_mask] = 0
+    return out
+
+
+def remove_small_areas(array, min_size):
+    # type: (np.array, int) -> np.array
+    """
+    Remove areas below a given size from the input segment array. Size referes to number of pixels.
+
+    :param array: segment array
+    :param min_size: minimum segment size
+    :return: input array, with areas larger than max_size removed
+    """
+    out = np.copy(array)
+    sizes = np.bincount(array.ravel())
+    too_small = sizes < min_size
+    too_small_mask = too_small[array]
+    out[too_small_mask] = 0
+    return out
+
+
+def zonal_statistics(image, vector, no_data=None, mode='med', id_column=None, col_name='DN', col_width=10, col_precision=4, outfile=None, overwrite=False):
+    # type: (str, str, int or float, str, str, str, int, int, str, bool) -> None
+    """
+    Calculate zonal statistics of a raster within polygons
+
+    :param image: Input image
+    :param vector: Input vector file
+    :param no_data: NoData value of raster
+    :param mode: Statistics that shall be calculated. Must be one of: med, mean, min, max, std, majority
+    :param id_column: Attribute column that holds the unique feature ID. If None, an automatic ID will be generated
+            internally.
+    :param col_name: New attribute name
+    :param col_width: New field width
+    :param col_precision: New field precision
+    :param outfile: Output vector file. If None, the input file will be updated.
+    :param overwrite: Overwrite output file, if it already exists
+    :return:
+    """
+    # TODO: implement gdal.RasterizeLayer without using subprocess
+
+    mode = mode.lower()
+    if mode not in ('med', 'mean', 'min', 'max', 'std', 'majority'):
+        raise ValueError('Mode {m} not implemented! Must be one of: med, mean, min, max, std, majority')
+    auto_id = False
+    if not id_column:
+        print('Generating automatic id...')
+        id_column = '_auto_id_'
+        vector_tools.create_field(vector, id_column, ogr.OFTInteger, 10, 0)
+        auto_id = True
+    print('Creating ID raster...')
+    id_raster = os.path.join(os.path.dirname(outfile), '__id_raster_TMP__.tif')
+    layername = os.path.splitext(os.path.basename(vector))[0]
+    res = get_raster_properties(image)[5][1]
+    xmin, xmax, ymin, ymax = get_raster_extent(image)
+    id_raster_nodata = -9999
+    cmd = ['gdal_rasterize', '-a', id_column, '-te', str(xmin), str(ymin), str(xmax), str(ymax), '-tr',
+           str(res), str(res), '-tap', '-ot', 'Int32', '-a_nodata', str(id_raster_nodata), '-l', layername, vector, id_raster]
+    if os.path.exists(id_raster):
+        delete_ds(id_raster)
+    run_cmd(cmd)
+    ds_raster = gdal.Open(image, gdal.GA_ReadOnly)
+    raster_data = ds_raster.GetRasterBand(1).ReadAsArray()
+    if no_data is not None:
+        raster_data = np.ma.masked_equal(raster_data, no_data)
+    ds_raster = None
+    ds_id = gdal.Open(id_raster, gdal.GA_ReadOnly)
+    id_array = ds_id.GetRasterBand(1).ReadAsArray()
+    ds_id = None
+    if outfile:
+        vector_tools.copy_ds(vector, outfile, overwrite)
+    else:
+        outfile = vector
+    if mode == 'majority':
+        vector_tools.create_field(outfile, col_name, ogr.OFTInteger, col_width, 0)
+    else:
+        vector_tools.create_field(outfile, col_name, ogr.OFTReal, col_width, col_precision)
+    ds_vector = ogr.Open(outfile, 1)
+    lyr = ds_vector.GetLayer()
+    print('Calculating {m} per unique ID...'.format(m=mode))
+    if not raster_data.dtype == 'int' and mode == 'majority':
+        warnings.warn('Mode "majority" only works with integer values! Converting accordingly!')
+    all_ids = np.unique(id_array[id_array != id_raster_nodata])
+    for fid in tqdm(all_ids, desc='Progress'):
+        segment = np.where(id_array == fid)
+        if mode == 'med':
+            data = np.ma.median(raster_data[segment])
+        elif mode == 'mean':
+            data = np.ma.mean(raster_data[segment])
+        elif mode == 'min':
+            data = np.ma.min(raster_data[segment])
+        elif mode == 'max':
+            data = np.ma.max(raster_data[segment])
+        elif mode == 'stdv':
+            data = np.ma.std(raster_data[segment])
+        elif mode == 'majority':
+            data = int(np.bincount(raster_data[segment].astype(int).flatten()).argmax())
+        else:
+            data = None
+        feat = lyr.GetFeature(fid)
+        if data.dtype == 'int':
+            feat.SetField(col_name, int(data))
+        else:
+            feat.SetField(col_name, float(data))
+        lyr.SetFeature(feat)
+        feat = None
+    lyr = None
+    ds_vector = None
+    vector_tools.create_spatial_index(outfile)
+    delete_ds(id_raster)
+    if auto_id:
+        vector_tools.delete_field(vector, id_column)
+    return
+
+
+if __name__ == '__main__':
+    img = r'd:\working\2294\Bands_Indices_MTindices_Radar_DEM_stack.tif'
+    image_segmentation(img, 10, 9, 1000, output=img.replace('.tif', '.shp'))

@@ -1,8 +1,48 @@
+import sys
+import warnings
 import math
-import string
+import fnmatch
 import utm
 import geopy.distance as distance
 from osgeo import osr
+
+osr.UseExceptions()
+
+
+def check_installed_epsg(epsg, silent=False):
+    # type: (int, bool) -> bool
+    """
+    Check if given EPSG code is installed and supported
+
+    :param epsg: EPSG code
+    :param silent: If True, a message is printed out
+    :return: True if installed, False if not
+    """
+    if 'win' in sys.platform.lower():
+        epsg_db = r'c:\Program Files\GDAL\projlib\epsg'
+    else:
+        epsg_db = r'/usr/share/proj/epsg'
+    with open(epsg_db, 'r') as f:
+        lines = f.readlines()
+    stmt = 'Given EPSG code {e} '.format(e=epsg)
+    for l in lines:
+        if ''.join(['<', str(epsg), '>']) in l:
+            try:
+                sr = osr.SpatialReference()
+                sr.ImportFromEPSG(epsg)
+                stmt += 'is valid!'
+                if not silent:
+                    print(stmt)
+                return True
+            except:
+                stmt += 'was found, but could not be imported!'
+                if not silent:
+                    print(stmt)
+                return False
+    stmt += 'was not found!'
+    if not silent:
+        print(stmt)
+    return False
 
 
 def get_epsg(spatial_ref):
@@ -13,9 +53,28 @@ def get_epsg(spatial_ref):
     :param spatial_ref: osr.SpatialReference object
     :return: EPSG code
     """
-    spatial_ref.AutoIdentifyEPSG()
-    epsg = int(spatial_ref.GetAttrValue('AUTHORITY', 1))
-    return epsg
+    try:
+        spatial_ref.AutoIdentifyEPSG()
+        return int(spatial_ref.GetAttrValue('AUTHORITY', 1))
+    except RuntimeError:
+        print('Could not auto-identify EPSG code! Trying to look it up in the database...')
+        proj_4 = spatial_ref.ExportToProj4()
+        pattern = '*' + '*'.join(proj_4.split(' '))
+        if 'win' in sys.platform.lower():
+            epsg_db = r'c:\Program Files\GDAL\projlib\epsg'
+        else:
+            epsg_db = r'/usr/share/proj/epsg'
+        with open(epsg_db, 'r') as f:
+            lines = f.readlines()
+        results = []
+        for l in lines:
+            if fnmatch.fnmatch(l, pattern):
+                epsg = int(l.split('>')[0].split('<')[-1])
+                results.append(epsg)
+        if len(results) > 1:
+            warnings.warn('Found more than one match! Choosing the one with the "largest" EPSG code!')
+            return sorted(results)[-1]
+        return False
 
 
 def get_crs_name(spatial_ref):
@@ -31,7 +90,7 @@ def get_crs_name(spatial_ref):
     else:
         srs_name = str(spatial_ref.GetAttrValue('PROJCS'))
     if '_' in srs_name:
-        srs_name = str(string.join(srs_name.split('_')))
+        srs_name = str(' '.join(srs_name.split('_')))
     return srs_name
 
 
@@ -240,3 +299,4 @@ def dms_to_dec_deg(dms):
 if __name__ == '__main__':
     print(dms_to_dec_deg((27, 10, 23.73)), dms_to_dec_deg((-90, -21, -56.28)))
     print(dms_to_dec_deg((24, 24, 58.36)), dms_to_dec_deg((-12, -27, -59.322)))
+

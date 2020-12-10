@@ -1,10 +1,10 @@
 import os
 import warnings
-import string
+import pandas as pd
 from tqdm import tqdm
-from osgeo import ogr, osr
+from osgeo import ogr, osr, gdal
 from collections import Counter
-
+import raster_tools
 
 OGR_FIELD_TYPES = [
     ogr.OFTBinary,
@@ -22,10 +22,35 @@ OGR_FIELD_TYPES = [
 ]
 
 
+def read_spatial_data_to_df(filepath, truth_column, prediction_columm, nodata=None):
+    # type: (str, str, str, int or float) -> (pd.DataFrame, list)
+    """
+    Read a vector file with truth and prediction attributes into a Pandas data frame
+
+    :param filepath: Input file
+    :param truth_column: Field name for truth values
+    :param prediction_columm: Field name for prediction values
+    :param nodata: NoData value that shall be ignored
+    :return: Tuple of (Pandas data frame holding the attributes "truth" and "prediction", sorted labels)
+    """
+    ds = ogr.Open(filepath)
+    lyr = ds.GetLayer()
+    df = pd.DataFrame(columns=['truth', 'prediction'])
+    for feature in lyr:
+        df.loc[len(df)] = [feature.GetField(truth_column), feature.GetField(prediction_columm)]
+    lyr = None
+    ds = None
+    if nodata:
+        df = df.fillna(nodata)
+    df['truth'] = df['truth'].astype('int')
+    df['prediction'] = df['prediction'].astype('int')
+    return df, sorted(list(set(df['truth'])))
+
+
 def create_ds(ds_name, ds_format, geom_type, srs, overwrite=False):
     # type: (str, str, ogr.Geometry, osr.SpatialReference, bool) -> (ogr.DataSource, ogr.Layer)
     """
-    Create an OGR Dataset and Layer. Remember to call ds.Destroy() after you finished editing it!
+    Create an OGR Dataset and Layer. Remember to call lyr = None and ds = None after you finished editing it!
 
     :param ds_name: Output filename.
     :param ds_format: File format.
@@ -56,7 +81,7 @@ def delete_ds(ds_name):
     """
     ds = ogr.Open(ds_name)
     drv = ds.GetDriver()
-    ds.Destroy()
+    ds = None
     drv.DeleteDataSource(ds_name)
     return
 
@@ -78,22 +103,40 @@ def copy_ds(src, dst, overwrite=False):
     ds = ogr.Open(src)
     drv = ds.GetDriver()
     out_ds = drv.CopyDataSource(ds, dst)
-    out_ds.Destroy()
-    ds.Destroy()
+    out_ds = None
+    ds = None
     return
 
 
-def create_field(ds_name, field_name, field_type, field_width, field_precision=None, initial_value=None):
-    # type: (str, str, ogr.FieldDefn, int, int, any) -> None
+def create_spatial_index(ds_name):
+    # type: (str) -> None
+    """
+    Create the spatial index which massively improves perfomance
+
+    :param ds_name: Input file
+    :return: --
+    """
+    lyrname = os.path.splitext(os.path.basename(ds_name))[0]
+    ds = ogr.Open(ds_name)
+    ds.ExecuteSQL('CREATE SPATIAL INDEX ON {lyr}'.format(lyr=lyrname), dialect='sqlite')
+    ds = None
+    return
+
+
+def create_field(ds_name, field_name, field_type, field_width, field_precision=None, initial_value=None, silent=False):
+    # type: (str, str, ogr.FieldDefn, int, int, any, bool) -> None
     """
     Create a new attribute field
 
     :param ds_name: Input file (will be updated)
     :param field_name: New field name
-    :param field_type: OGR filed type. One of: ogr.OFTBinary, ogr.OFTDate, ogr.OFTDateTime, ogr.OFTInteger, ogr.OFTIntegerList, ogr.OFTReal, ogr.OFTRealList, ogr.OFTString, ogr.OFTStringList, ogr.OFTTime, ogr.OFTWideString, ogr.OFTWideStringList
+    :param field_type: OGR field type. One of: ogr.OFTBinary, ogr.OFTDate, ogr.OFTDateTime, ogr.OFTInteger,
+            ogr.OFTIntegerList, ogr.OFTReal, ogr.OFTRealList, ogr.OFTString, ogr.OFTStringList, ogr.OFTTime,
+            ogr.OFTWideString, ogr.OFTWideStringList
     :param field_width: Field width. For safety, use one more than the lenght of your maximum value
     :param field_precision: Field precision (only needed for floating point field)
     :param initial_value: Default value for all features. Data type needs to match the chosen field_type
+    :param silent: Suppress print messages
     :return: --
     """
     if not os.path.exists(ds_name):
@@ -104,26 +147,55 @@ def create_field(ds_name, field_name, field_type, field_width, field_precision=N
     if field_type not in OGR_FIELD_TYPES:
         raise ValueError('Given field type not supported by OGR! Use one of the following: {types}'.format(
             types=', '.join([t for t in OGR_FIELD_TYPES])))
-    print('Creating field {f} as new attribute for {ds}...'.format(f=field_name, ds=ds_name))
+    if not silent:
+        print('Creating field {f} as new attribute for {ds}...'.format(f=field_name, ds=ds_name))
     ds = ogr.Open(ds_name, 1)
     lyr = ds.GetLayer()
     field_defn = lyr.GetLayerDefn()
     fieldnames = [field_defn.GetFieldDefn(f).name.lower() for f in range(field_defn.GetFieldCount())]
     if field_name.lower() in fieldnames:
-        ds.Destroy()
+        lyr = None
+        ds = None
         raise KeyError('Chosen field name "{n}" already exists!'.format(n=field_name))
     field_defn = ogr.FieldDefn(field_name, field_type)
     field_defn.SetWidth(int(field_width))
     if field_precision:
         field_defn.SetPrecision(int(field_precision))
     lyr.CreateField(field_defn)
-    if initial_value != None:
+    if initial_value is not None:
         for feature in tqdm(lyr, desc='Setting initial value'):
             feature.SetField(field_name, initial_value)
             lyr.SetFeature(feature)
     repack(ds, lyr)
-    ds.Destroy()
-    print('Done!')
+    lyr = None
+    ds = None
+    if not silent:
+        print('Done!')
+    return
+
+
+def delete_field(ds_name, field_name):
+    # type: (str, str) -> None
+    """
+    Delete an attribute field from a vector file
+
+    :param ds_name: Input file (will be updated)
+    :param field_name: Field to delete
+    :return:
+    """
+    ds = ogr.Open(ds_name, 1)
+    lyr = ds.GetLayer()
+    layername = os.path.splitext(os.path.basename(ds_name))[0]
+    field_defn = lyr.GetLayerDefn()
+    fieldnames = [field_defn.GetFieldDefn(f).name.lower() for f in range(field_defn.GetFieldCount())]
+    if field_name.lower() not in fieldnames:
+        lyr = None
+        ds = None
+        raise KeyError('Chosen field name "{n}" does not exist!'.format(n=field_name))
+    ds.ExecuteSQL('ALTER TABLE {lyrname} DROP COLUMN {f}'.format(lyrname=layername, f=field_name))
+    repack(ds, lyr)
+    lyr = None
+    ds = None
     return
 
 
@@ -160,28 +232,31 @@ def close_rings(ds_name):
     for copy in copies:
         lyr.CreateFeature(copy)
     repack(ds, lyr)
-    ds.Destroy()
+    lyr = None
+    ds = None
     return
 
 
-def getExtent(input):
+def get_extent(ds_name):
+    # type: (str) -> (float, float, float, float)
     """
     Get maximum the extent of an OGR Dataset
 
-    :param str input: Input filename
+    :param str ds_name: Input filename
     :return: Extent as a tuple of (xmin, ymin, xmax, ymax)
     :rtype tuple
     """
 
-    ds = ogr.Open(input)
+    ds = ogr.Open(ds_name)
     lyr = ds.GetLayer()
     ulx, lrx, uly, lry = lyr.GetExtent()
-    ds.Destroy()
+    lyr = None
+    ds = None
     return ulx, uly, lrx, lry
 
 
 def create_points_from_coords(outfile, coords, epsg=4326, outformat='ESRI Shapefile', overwrite=False):
-    # type: (str, (float, float), int, str, bool) -> None
+    # type: (str, tuple or list, int, str, bool) -> None
     """
     Create a point vector file from a list of xy-coordinates
 
@@ -217,7 +292,9 @@ def create_points_from_coords(outfile, coords, epsg=4326, outformat='ESRI Shapef
         lyr.CreateFeature(feat)
         feat = None
         geom = None
-    lyr = ds = None
+    lyr = None
+    ds = None
+    create_spatial_index(outfile)
     return
 
 
@@ -264,7 +341,11 @@ def create_polygon_from_bbox(outfile, ulx, uly, lrx, lry, epsg=4326, outformat='
     geom = ogr.CreateGeometryFromWkb(poly.ExportToWkb())
     feat.SetGeometry(geom)
     lyr.CreateFeature(feat)
-    feat = geom = lyr = ds = None
+    geom = None
+    feat = None
+    lyr = None
+    ds = None
+    create_spatial_index(outfile)
     return
 
 
@@ -307,7 +388,11 @@ def create_polygon_from_coords(outfile, coords, epsg=4326, outformat='ESRI Shape
     geom = ogr.CreateGeometryFromWkb(poly.ExportToWkb())
     feat.SetGeometry(geom)
     lyr.CreateFeature(feat)
-    feat = geom = lyr = ds = None
+    geom = None
+    feat = None
+    lyr = None
+    ds = None
+    create_spatial_index(outfile)
     return
 
 
@@ -332,17 +417,18 @@ def assign_projection(input, epsg):
     return
 
 
-def reproject(ds_name, epsg, output, overwrite=False):
+def reproject(ds_name, epsg, outfile, overwrite=False):
     # type: (str, int, str, bool) -> None
     """
     (Re)project a vector file
 
     :param ds_name: Input filename
     :param epsg: EPSG-code of output coordinate system
-    :param output: Output filename
+    :param outfile: Output filename
     :param overwrite: Overwrite output file, if it already exists
     :return: --
     """
+    create_spatial_index(ds_name)
     in_ds = ogr.Open(ds_name)
     in_lyr = in_ds.GetLayer()
     in_srs = in_lyr.GetSpatialRef()
@@ -350,77 +436,86 @@ def reproject(ds_name, epsg, output, overwrite=False):
         raise StandardError('{s} has no spatial reference!'.format(s=ds_name))
     out_srs = osr.SpatialReference()
     out_srs.ImportFromEPSG(epsg)
-    ds, lyr = create_ds(output, in_ds.GetDriver().GetName(), in_lyr.GetGeomType(), out_srs, overwrite)
+    ds, lyr = create_ds(outfile, in_ds.GetDriver().GetName(), in_lyr.GetGeomType(), out_srs, overwrite)
     f_defn = lyr.GetLayerDefn()
     transformer = osr.CoordinateTransformation(in_srs, out_srs)
     feature = in_lyr.GetFeature(0)
     for f in range(len(feature.keys())):
         lyr.CreateField(feature.GetFieldDefnRef(f))
-    feature.Destroy()
+    feature = None
     for feature in in_lyr:
         geom = feature.GetGeometryRef()
         geom.Transform(transformer)
         out_feat = ogr.Feature(f_defn)
         out_feat.SetGeometry(geom)
+        geom = None
         # get attribute fields
         for key in feature.keys():
             out_feat.SetField(feature.keys().index(key), feature.GetField(key))
         lyr.CreateFeature(out_feat)
-        feature.Destroy()
-    ds.Destroy()
-    in_ds.Destroy()
+        feature = None
+    lyr = None
+    ds = None
+    in_lyr = None
+    in_ds = None
+    create_spatial_index(outfile)
     return
 
 
-def merge(files, output, overwrite=True):
+def merge(files, outfile, overwrite=True):
     # type: (list or tuple, str, bool) -> None
     """
     Merge vector files (assuming they share the same coordinate system)
 
     :param files: List of input files of the same geometry type (e.g. all polygons)
-    :param output: Output file
+    :param outfile: Output file
     :param overwrite: Overwrite output, if it already exists
     :return: --
     """
     geom_types = []
     for f in files:
+        create_spatial_index(f)
         ds = ogr.Open(f)
         lyr = ds.GetLayer()
         geom_types.append(lyr.GetGeomType())
-        ds.Destroy()
+        lyr = None
+        ds = None
     if len(set(geom_types)) != 1:
         raise AttributeError('Input files have different geometry types!')
     # initiate output
-    if os.path.exists(output) and overwrite is True:
-        delete_ds(output)
-    elif os.path.exists(output) and overwrite is False:
+    if os.path.exists(outfile) and overwrite is True:
+        delete_ds(outfile)
+    elif os.path.exists(outfile) and overwrite is False:
         raise ValueError('Output file {out} already exists and shall not be overwritten! Please choose another name or '
-                         'set overwrite=True.'.format(out=output))
+                         'set overwrite=True.'.format(out=outfile))
     ds = ogr.Open(files[0])
     lyr = ds.GetLayer()
     srs = osr.SpatialReference()
     srs.ImportFromWkt(lyr.GetSpatialRef().ExportToWkt())
     drv = ds.GetDriver()
-    ds.Destroy()
-    out_ds, out_lyr = create_ds(output, drv.GetName(), geom_types[0], srs)
-    featureDefn = out_lyr.GetLayerDefn()
+    lyr = None
+    ds = None
+    out_ds, out_lyr = create_ds(outfile, drv.GetName(), geom_types[0], srs)
+    feature_defn = out_lyr.GetLayerDefn()
     # merge
     for f in files:
         ds = ogr.Open(f)
         lyr = ds.GetLayer()
         for feature in range(lyr.GetFeatureCount()):
             feat = lyr.GetFeature(feature)
-            out_feat = ogr.Feature(featureDefn)
+            out_feat = ogr.Feature(feature_defn)
             out_feat.SetGeometry(feat.GetGeometryRef())
             out_lyr.CreateFeature(out_feat)
-            out_feat.Destroy()
-            feat.Destroy()
+            out_feat = None
+            feat = None
     repack(out_ds, out_lyr)
-    out_ds.Destroy()
+    out_lyr = None
+    out_lyr = None
+    create_spatial_index(outfile)
     return
 
 
-def spatial_join(polygons, points, output, fields, mode='majority', count_field=None, overwrite=False):
+def spatial_join(polygons, points, outfile, fields, mode='majority', count_field=None, overwrite=False):
     # type: (str, str, str, list or tuple, str, str, bool) -> None
     """
     Join attributes from a point vector file to a polygon vector file. Attributes need to have
@@ -428,7 +523,7 @@ def spatial_join(polygons, points, output, fields, mode='majority', count_field=
 
     :param polygons: Path to polygon vector file
     :param points: Path to point vector file
-    :param output: Path to output file
+    :param outfile: Path to output file
     :param fields: List of field names that shall be joined. May also be a string if only one field shall be used.
     :param mode: Join mode in case more than one point is contained in the same polygon. Choices are: <br>
         - first: first occurrence, based on FID <br>
@@ -450,8 +545,10 @@ def spatial_join(polygons, points, output, fields, mode='majority', count_field=
         count_field = fields[0]
     if not isinstance(fields, list):
         fields = [fields]
-    copy_ds(polygons, output, overwrite)
-    out_ds = ogr.Open(output, 1)
+    copy_ds(polygons, outfile, overwrite)
+    create_spatial_index(points)
+    create_spatial_index(outfile)
+    out_ds = ogr.Open(outfile, 1)
     out_lyr = out_ds.GetLayer()
     out_lyr_defn = out_lyr.GetLayerDefn()
     out_fieldnames = [out_lyr_defn.GetFieldDefn(f).name.lower() for f in range(out_lyr_defn.GetFieldCount())]
@@ -460,17 +557,21 @@ def spatial_join(polygons, points, output, fields, mode='majority', count_field=
     point_defn = point_lyr.GetLayerDefn()
     point_fieldnames = [point_defn.GetFieldDefn(f).name.lower() for f in range(point_defn.GetFieldCount())]
     if count_field.lower() not in point_fieldnames:
-        point_ds.Destroy()
-        out_ds.Destroy()
-        delete_ds(output)
+        point_lyr = None
+        point_ds = None
+        out_lyr = None
+        out_ds = None
+        delete_ds(outfile)
         raise KeyError('Desired "count_field" {f} does not exist!'.format(f=count_field))
     print('Creating new fields...')
     for f, field_name in enumerate(fields):
         f_index = point_lyr.FindFieldIndex(field_name, 1)
         if f_index < 0:
-            out_ds.Destroy()
-            point_ds.Destroy()
-            delete_ds(output)
+            point_lyr = None
+            point_ds = None
+            out_lyr = None
+            out_ds = None
+            delete_ds(outfile)
             raise KeyError('Desired field {f} does not exist!'.format(f=field_name))
         if field_name.lower() in out_fieldnames:
             warnings.warn('WARNING: Field name {f} already exists! It will be adjusted automatically!'.format(
@@ -514,42 +615,47 @@ def spatial_join(polygons, points, output, fields, mode='majority', count_field=
         else:
             out_lyr.DeleteFeature(segment.GetFID())
     repack(out_ds, out_lyr)
-    out_ds.Destroy()
-    point_ds.Destroy()
+    point_lyr = None
+    point_ds = None
+    out_lyr = None
+    out_ds = None
     return
 
 
-def intersect(files, output, overwrite=True):
+def intersect(files, outfile, overwrite=True):
     # type: (list or tuple, str, bool) -> None
     """
     Intersect vector files (assuming they share the same coordinate system)
 
     :param files: List of input files of the same geometry type (e.g. all polygons)
-    :param output: Output file
+    :param outfile: Output file
     :param overwrite: Overwrite output, if it already exists
     :return: --
     """
     geom_types = []
     for f in files:
+        create_spatial_index(f)
         ds = ogr.Open(f)
         lyr = ds.GetLayer()
         geom_types.append(lyr.GetGeomType())
-        ds.Destroy()
+        lyr = None
+        ds = None
     if len(set(geom_types)) != 1:
         raise AttributeError('Input files have different geometry types!')
     # initiate output
-    if os.path.exists(output) and overwrite is True:
-        delete_ds(output)
-    elif os.path.exists(output) and overwrite is False:
+    if os.path.exists(outfile) and overwrite is True:
+        delete_ds(outfile)
+    elif os.path.exists(outfile) and overwrite is False:
         raise ValueError('Output file {out} already exists and shall not be overwritten! Please choose another name or '
-                         'set overwrite=True.'.format(out=output))
+                         'set overwrite=True.'.format(out=outfile))
     ds = ogr.Open(files[0])
     lyr = ds.GetLayer()
     srs = osr.SpatialReference()
     srs.ImportFromWkt(lyr.GetSpatialRef().ExportToWkt())
     drv = ds.GetDriver()
-    ds.Destroy()
-    out_ds, out_lyr = create_ds(output, drv.GetName(), geom_types[0], srs)
+    lyr = None
+    ds = None
+    out_ds, out_lyr = create_ds(outfile, drv.GetName(), geom_types[0], srs)
     # intersect
     intersection = ogr.Geometry(geom_types[0])
     for f in files:
@@ -561,35 +667,39 @@ def intersect(files, output, overwrite=True):
                 intersection = intersection.Union(feat.GetGeometryRef())
             else:
                 intersection = intersection.Intersection(feat.GetGeometryRef())
-            feat.Destroy()
-        ds.Destroy()
-    featureDefn = out_lyr.GetLayerDefn()
-    feature = ogr.Feature(featureDefn)
+            feat = None
+        lyr = None
+        ds = None
+    feature_defn = out_lyr.GetLayerDefn()
+    feature = ogr.Feature(feature_defn)
     feature.SetGeometry(intersection)
     out_lyr.CreateFeature(feature)
-    feature.Destroy()
+    feature = None
     repack(out_ds, out_lyr)
-    out_ds.Destroy()
+    lyr = None
+    ds = None
+    create_spatial_index(outfile)
     return
 
 
-def buffer(ds_name, dist, output, overwrite):
+def buffering(ds_name, dist, outfile, overwrite):
     # type: (str, int or float, str, bool) -> None
     """
     Buffer a vector file by a given distance
 
     :param ds_name: Input file
     :param dist: Buffer distance in map units (as defined within the spatial reference)
-    :param output: Output file
+    :param outfile: Output file
     :param overwrite: Overwrite output file, if it already exists
     :return: --
     """
+    create_spatial_index(ds_name)
     ds = ogr.Open(ds_name, 0)
     lyr = ds.GetLayer()
     drv = ds.GetDriver()
     srs = osr.SpatialReference()
     srs.ImportFromWkt(lyr.GetSpatialRef().ExportToWkt())
-    out_ds, out_lyr = create_ds(output, drv.GetName(), lyr.GetGeomType(), srs, overwrite)
+    out_ds, out_lyr = create_ds(outfile, drv.GetName(), lyr.GetGeomType(), srs, overwrite)
     defn = out_lyr.GetLayerDefn()
     for feat in lyr:
         geom = feat.GetGeometryRef()
@@ -597,26 +707,30 @@ def buffer(ds_name, dist, output, overwrite):
         out_feat = ogr.Feature(defn)
         out_feat.SetGeometry(geom_buff)
         out_lyr.CreateFeature(out_feat)
-    ds.Destroy()
+    lyr = None
+    ds = None
     repack(out_ds, out_lyr)
-    out_ds.Destroy()
+    out_lyr = None
+    out_ds = None
+    create_spatial_index(outfile)
     return
 
 
-def simplify(ds_name, tolerance, output, overwrite=False):
+def simplify(ds_name, tolerance, outfile, overwrite=False):
     # type: (str, int or float, str, bool) -> None
     """
     Simplify the geometries of a vector file within a given distance tolerance
 
     :param ds_name: Input filename
     :param tolerance: Distance tolerance for simplification
-    :param output: Output filename
+    :param outfile: Output filename
     :param overwrite: Overwrite output file, if it already exists
     :return: --
     """
+    create_spatial_index(ds_name)
     ds = ogr.Open(ds_name, 0)
     lyr = ds.GetLayer()
-    out_ds, out_lyr = create_ds(output, ds.GetDriver().GetName(), lyr.GetGeomType(), lyr.GetSpatialRef(), overwrite)
+    out_ds, out_lyr = create_ds(outfile, ds.GetDriver().GetName(), lyr.GetGeomType(), lyr.GetSpatialRef(), overwrite)
     defn = out_lyr.GetLayerDefn()
     for feat in lyr:
         geom = feat.GetGeometryRef()
@@ -624,26 +738,30 @@ def simplify(ds_name, tolerance, output, overwrite=False):
         out_feat = ogr.Feature(defn)
         out_feat.SetGeometry(geom_buff)
         out_lyr.CreateFeature(out_feat)
-    ds.Destroy()
+    lyr = None
+    ds = None
     repack(out_ds, out_lyr)
-    out_ds.Destroy()
+    out_lyr = None
+    out_ds = None
+    create_spatial_index(outfile)
     return
 
 
-def dissolve(ds_name, output, multipoly=False, overwrite=False):
+def dissolve(ds_name, outfile, multipoly=False, overwrite=False):
     # type: (str, str, bool, bool) -> None
     """
     Dissolve a vector file
 
     :param ds_name: Input filename
-    :param output: Output filename
+    :param outfile: Output filename
     :param multipoly: True for multipart polygon, False for many singlepart polygons
     :param overwrite: Overwrite output file, if it already exists
     :return: --
     """
+    create_spatial_index(ds_name)
     ds = ogr.Open(ds_name, 0)
     lyr = ds.GetLayer()
-    out_ds, out_lyr = create_ds(output, ds.GetDriver().GetName(), lyr.GetGeomType(), lyr.GetSpatialRef(), overwrite)
+    out_ds, out_lyr = create_ds(outfile, ds.GetDriver().GetName(), lyr.GetGeomType(), lyr.GetSpatialRef(), overwrite)
     defn = out_lyr.GetLayerDefn()
     multi = ogr.Geometry(ogr.wkbMultiPolygon)
     for feat in lyr:
@@ -658,13 +776,53 @@ def dissolve(ds_name, output, multipoly=False, overwrite=False):
             feat = ogr.Feature(defn)
             feat.SetGeometry(poly)
             out_lyr.CreateFeature(feat)
+            feat = None
     else:
         out_feat = ogr.Feature(defn)
         out_feat.SetGeometry(union)
         out_lyr.CreateFeature(out_feat)
-        out_ds.Destroy()
+        out_lyr = None
+        out_ds = None
     repack(out_ds, out_lyr)
-    ds.Destroy()
+    lyr = None
+    ds = None
+    create_spatial_index(outfile)
+    return
+
+
+def rasterize_vector(ds_name, field, outfile, resolution, dtype, no_data, of='GTiff', co=None, overwrite=False):
+    # type: (str, str, str, int, str, int or float, str, list, bool) -> None
+    """
+    Rasterize a vector layer
+
+    :param ds_name: Input vector file name
+    :param field: Attribute field that shall be converted to raster values
+    :param outfile: Output file name
+    :param resolution: Output resolution
+    :param dtype: Output data type. One of (Byte, UInt16, Int16, UInt32, Int32, Float32, Float64, CInt16, CInt32,
+            CFloat32, CFloat64)
+    :param no_data: NoData value for output raster
+    :param of: Output format as defined at http://www.gdal.org/formats_list.html
+    :param co: Advanced raster creation options such as band interleave or compression. <br<>
+            Example: co=['compress=lzw']
+    :param overwrite: Overwrite output file if it already exists
+    :return: --
+    """
+    ds_shp = ogr.Open(ds_name)
+    lyr = ds_shp.GetLayer()
+    proj = lyr.GetSpatialRef()
+    lyr = None
+    ds_shp = None
+    xmin, ymin, xmax, ymax = get_extent(ds_name)
+    geotrans = (xmin, resolution, 0, ymax, 0, -resolution)
+    cols = int((xmax - xmin) / resolution)
+    rows = int((ymax - ymin) / resolution)
+    ds = raster_tools.create_ds(outfile, cols, rows, 1, gdal.GetDataTypeByName(dtype), of=of, co=co, overwrite=overwrite)
+    ds.SetGeoTransform(geotrans)
+    ds.SetProjection(proj.ExportToWkt())
+    gdal.RasterizeLayer(ds, [1], lyr, options=['ALL_TOUCHED=TRUE', 'ATTRIBUTE={f}'.format(f=field)])
+    ds.GetRasterBand(1).SetNoDataValue(no_data)
+    ds = None
     return
 
 
@@ -684,11 +842,14 @@ def get_unique_attributes(ds_name, field, show=False):
         raise AttributeError('Desired field {f} does not exist!'.format(f=field))
     attributes = [f.GetField(field) for f in lyr]
     out_dict = dict(Counter(attributes))
+    lyr = None
+    ds = None
     if show is True:
         print('Total number of features: {n}'.format(n=len(attributes)))
-        print(string.join(['Attribute', '\t', 'Count', '\n'], sep=''))
+        print('Unique values for field {f}: {n}'.format(f=field, n=len(out_dict.keys())))
+        print(''.join(['Attribute', '\t', 'Count', '\n']))
         for k in sorted(out_dict.keys()):
-            print k, '\t', out_dict[k]
+            print('\t'.join([str(k), str(out_dict[k])]))
     return out_dict
 
 
@@ -713,6 +874,8 @@ def attribute_mapping(ds_name, field, map_field, show=False):
         value = feature.GetField(map_field)
         if key not in out_dict.keys():
             out_dict[key] = value
+    lyr = None
+    ds = None
     if show is True:
         print 'Attribute', '\t', 'Mapped Value', '\n'
         for k in sorted(out_dict.keys()):
